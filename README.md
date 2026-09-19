@@ -25,9 +25,9 @@ The build writes the deployable static site to `dist/` and preserves `.openai/ho
 
 ### v10 SaaS foundation
 
-The current Sites deployment is static-only. The verified environment provides static publishing and owner-only access, but no server API routes, database binding, HTTP-only session service, background jobs, object storage, or configured runtime variables. The frontend therefore keeps local persistence as its safe default and exposes a typed cloud boundary under `src/cloud/` for an approved backend configured through `VITE_WEBKILN_API_URL`.
+The current private Sites deployment/version 10 remains static-only. The repository now also contains a separate Cloudflare Worker v11 testing surface: Hono API routes, D1/Drizzle persistence, Better Auth cookie sessions, and Worker-hosted static assets with SPA fallback. The frontend keeps local persistence as its safe default and can use the combined Worker with `VITE_WEBKILN_CLOUD_MODE=true` and relative `/api` requests.
 
-The cloud boundary includes typed auth/project/revision contracts, a credentials-included API client, payload validation and size limits, optimistic-revision autosave queueing, offline/conflict states, safe redirect validation, and local-project import previews with migration backups. It does not fake production authentication or claim browser-only local storage is secure authentication. Production v10 still needs an approved backend implementing HTTP-only SameSite sessions, relational persistence, role enforcement, CSRF protection, rate limiting, and the documented `/api` contract.
+The cloud boundary includes typed auth/project/revision contracts, a credentials-included API client, a cloud project adapter, payload validation and size limits, optimistic-revision autosave queueing, offline/conflict states, safe redirect validation, and local-project import previews with migration backups. The Worker implements HTTP-only cookie sessions, D1-backed relational persistence, membership/role enforcement, revision conflict checks, explicit CORS/trusted origins, and the documented `/api` contract. Remote deployment still requires the account owner to authenticate Wrangler and supply the exact development D1 ID.
 
 - `src/main.ts` bootstraps the editor and keeps the existing shell behavior intact.
 - `src/editor/grapesjs-adapter.ts` owns the real GrapesJS dependency behind the `EditorAdapter` interface.
@@ -40,6 +40,6 @@ The cloud boundary includes typed auth/project/revision contracts, a credentials
 
 The Vite/TypeScript foundation, structured project model, real GrapesJS adapter, visible GrapesJS canvas, WebKiln block bridge, nested selection, inspector controls, layers tree, page switching, responsive devices, preview mode, autosave, and recovery path are in place. The old version-6 scripts remain in `src/legacy/` only as rollback/reference material and are not imported by the active runtime.
 
-The following are intentionally out of scope for this phase: authentication, billing, ecommerce, collaboration, a hosted backend, and a production custom-code execution service. Custom code remains isolated in project data and is not evaluated by the editor.
+Billing, ecommerce, collaboration, and a production custom-code execution service remain intentionally out of scope. Authentication and the hosted testing backend now exist behind the approved free-tier Cloudflare boundary. Custom code remains isolated in project data and is not evaluated by the editor.
 
 The generated `dist/` folder is deployment output; edit `src/` and rebuild rather than editing generated files directly.

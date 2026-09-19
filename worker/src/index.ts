@@ -520,6 +520,13 @@ app.post('/api/sites/:siteId/revisions/:revisionId/restore', async (c) => {
   });
 });
 
+app.notFound((c) => {
+  if (new URL(c.req.url).pathname.startsWith('/api/')) {
+    return jsonError(c, 404, 'NOT_FOUND', 'API route not found');
+  }
+  return c.env.ASSETS.fetch(c.req.raw);
+});
+
 function toPage(item: typeof page.$inferSelect) {
   return {
     id: item.id,

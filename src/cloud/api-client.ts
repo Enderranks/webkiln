@@ -21,11 +21,13 @@ export class CloudApiError extends Error {
 
 export class WebKilnApiClient implements ProjectRepository, AuthProvider {
   private readonly baseUrl: string;
+  private readonly sameOrigin: boolean;
   constructor(baseUrl = import.meta.env.VITE_WEBKILN_API_URL ?? '') {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.sameOrigin = import.meta.env.VITE_WEBKILN_CLOUD_MODE === 'true';
   }
   get configured(): boolean {
-    return Boolean(this.baseUrl);
+    return Boolean(this.baseUrl) || this.sameOrigin;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -43,14 +45,38 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
     }
     return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
   }
-  getSession(): Promise<Session | null> {
-    return this.request<Session | null>('/api/auth/session');
+  private normalizeSession(response: BetterAuthSessionResponse | null): Session | null {
+    if (!response?.user || !response.session) return null;
+    return {
+      user: {
+        id: response.user.id,
+        email: response.user.email,
+        displayName: response.user.name,
+        status: 'active',
+      },
+      expiresAt: String(response.session.expiresAt),
+    };
   }
-  signIn(email: string, password: string): Promise<Session> {
-    return this.request('/api/auth/sign-in', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  async getSession(): Promise<Session | null> {
+    return this.normalizeSession(
+      await this.request<BetterAuthSessionResponse | null>('/api/auth/get-session'),
+    );
+  }
+  async signUp(name: string, email: string, password: string): Promise<Session> {
+    return this.normalizeSession(
+      await this.request<BetterAuthSessionResponse>('/api/auth/sign-up/email', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password }),
+      }),
+    ) as Session;
+  }
+  async signIn(email: string, password: string): Promise<Session> {
+    return this.normalizeSession(
+      await this.request<BetterAuthSessionResponse>('/api/auth/sign-in/email', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }),
+    ) as Session;
   }
   signOut(): Promise<void> {
     return this.request('/api/auth/sign-out', { method: 'POST' });
@@ -104,4 +130,9 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
       { method: 'POST', body: JSON.stringify({ expectedRevision }) },
     );
   }
+}
+
+interface BetterAuthSessionResponse {
+  user?: { id: string; email: string; name: string };
+  session?: { expiresAt: string | Date };
 }

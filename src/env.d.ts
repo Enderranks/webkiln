@@ -5,6 +5,7 @@ import type { WebKilnProject } from './types';
 declare global {
   interface ImportMetaEnv {
     readonly VITE_WEBKILN_API_URL?: string;
+    readonly VITE_WEBKILN_CLOUD_MODE?: string;
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv;
