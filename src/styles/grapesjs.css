@@ -1,0 +1,23 @@
+#siteCanvas.grapesjs-mounted{padding:0;display:block;position:relative;overflow:hidden;max-width:none;background:#0b0d0f}
+#siteCanvas.grapesjs-mounted .gjs-editor{height:100%;min-height:640px;background:transparent}
+#siteCanvas.grapesjs-mounted .gjs-cv-canvas{position:relative;inset:auto;width:100%;height:100%;min-height:640px;background:transparent;padding:0;overflow:hidden}
+#siteCanvas.grapesjs-mounted .gjs-frame-wrapper{width:100%;height:100%;min-height:640px;display:flex;justify-content:center;align-items:flex-start;background:transparent}
+#siteCanvas.grapesjs-mounted .gjs-frame{position:relative;display:block;width:100%;height:100%;min-height:640px;border:0;box-shadow:none;transition:max-width .2s}
+#siteCanvas.grapesjs-mounted .gjs-highlighter,.gjs-selected-parent{outline-color:#d6ad61!important}
+#siteCanvas.grapesjs-mounted .gjs-selected{outline:2px solid #d6ad61!important;outline-offset:-2px}
+#siteCanvas.grapesjs-mounted .gjs-toolbar{background:#151a1d;border:1px solid #d6ad61;border-radius:6px}
+#siteCanvas.grapesjs-mounted .gjs-toolbar-item{color:#f7f7f5}
+#siteCanvas.grapesjs-mounted .gjs-pn-panels,.gjs-pn-views,.gjs-blocks-c{display:none!important}
+#siteCanvas.grapesjs-mounted .gjs-cv-canvas__frames{min-height:640px}
+#canvasWrap.drop-ready{outline:2px dashed rgba(214,173,97,.8);outline-offset:-12px}
+.layer-children{margin-left:16px;border-left:1px solid #2b3337;padding-left:4px}
+.dynamic-field textarea{min-height:72px;resize:vertical;background:#101316;border:1px solid var(--line);border-radius:7px;color:#fff;padding:8px}
+.dynamic-field input{height:36px;background:#101316;border:1px solid var(--line);border-radius:7px;color:#fff;padding:0 8px}
+.dynamic-actions{display:flex;gap:8px;margin-top:16px}
+.dynamic-actions button{flex:1;border:1px solid var(--line);background:#151a1d;border-radius:7px;color:#dce2e0;padding:8px;cursor:pointer}
+.dynamic-actions button:last-child{color:#f08080}
+.editor-shell.preview-mode .workspace{grid-column:1/-1}
+.editor-shell.preview-mode #siteCanvas.grapesjs-mounted .gjs-selected{outline:0!important}
+.editor-shell.preview-mode #siteCanvas.grapesjs-mounted .gjs-toolbar{display:none!important}
+.webkiln-preview .canvas-toolbar,.webkiln-preview .selection-tag{display:none!important}
+.webkiln-preview .section-block.selected,.webkiln-preview .section-block:hover{box-shadow:none!important}

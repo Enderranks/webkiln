@@ -8,6 +8,7 @@ declare global {
       adapter?: GrapesJSEditorAdapter;
       project?: WebKilnProject;
       storage?: LocalProjectStorage;
+      recoverLegacy?: () => WebKilnProject | null;
       [key: string]: unknown;
     };
     select?: (element: Element | null) => void;

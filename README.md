@@ -32,7 +32,7 @@ The build writes the deployable static site to `dist/` and preserves `.openai/ho
 
 ## Migration status
 
-The Vite/TypeScript foundation, structured project model, real GrapesJS adapter, build pipeline, and smoke-tested editor bridge are in place. The current adapter runs GrapesJS as a headless model layer while the version-6 native canvas remains the visible rendering surface. This preserves the current UI and behavior during incremental migration.
+The Vite/TypeScript foundation, structured project model, real GrapesJS adapter, visible GrapesJS canvas, WebKiln block bridge, nested selection, inspector controls, layers tree, page switching, responsive devices, preview mode, autosave, and recovery path are in place. The old version-6 scripts remain in `src/legacy/` only as rollback/reference material and are not imported by the active runtime.
 
 The following are intentionally out of scope for this phase: authentication, billing, ecommerce, collaboration, a hosted backend, and a production custom-code execution service. Custom code remains isolated in project data and is not evaluated by the editor.
 
