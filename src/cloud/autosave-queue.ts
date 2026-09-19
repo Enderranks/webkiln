@@ -8,6 +8,7 @@ export class CloudAutosaveQueue {
   private pending: WebKilnProject | null = null;
   private timer: number | undefined;
   private saving = false;
+  private blockedByConflict = false;
   private revision: number;
   constructor(
     private readonly repository: ProjectRepository,
@@ -18,6 +19,7 @@ export class CloudAutosaveQueue {
     this.revision = initialRevision;
   }
   queue(project: WebKilnProject): void {
+    if (this.blockedByConflict) return;
     this.pending = validateProjectPayload(project);
     this.onState('saving');
     window.clearTimeout(this.timer);
@@ -38,20 +40,27 @@ export class CloudAutosaveQueue {
       return result;
     } catch (error) {
       this.pending = project;
-      this.onState(
-        error instanceof TypeError
-          ? 'offline'
-          : error instanceof Error && error.message.includes('CONFLICT')
-            ? 'conflict'
-            : 'failed',
-      );
+      const isConflict =
+        error instanceof Error &&
+        (error.message.includes('CONFLICT') ||
+          error.message.includes('REVISION_MISMATCH') ||
+          ('status' in error && (error as { status?: number }).status === 409));
+      if (isConflict) {
+        this.blockedByConflict = true;
+        this.pending = null;
+      }
+      this.onState(isConflict ? 'conflict' : error instanceof TypeError ? 'offline' : 'failed');
       return null;
     } finally {
       this.saving = false;
-      if (this.pending) window.setTimeout(() => void this.flush(), 50);
+      if (this.pending && !this.blockedByConflict) window.setTimeout(() => void this.flush(), 50);
     }
   }
   get pendingProject(): WebKilnProject | null {
     return this.pending;
+  }
+  unblockWithRevision(revision: number): void {
+    this.revision = revision;
+    this.blockedByConflict = false;
   }
 }

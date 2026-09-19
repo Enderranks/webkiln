@@ -29,6 +29,8 @@ The current private Sites deployment/version 10 remains static-only. The reposit
 
 The cloud boundary includes typed auth/project/revision contracts, a credentials-included API client, a cloud project adapter, payload validation and size limits, optimistic-revision autosave queueing, offline/conflict states, safe redirect validation, and local-project import previews with migration backups. The Worker implements HTTP-only cookie sessions, D1-backed relational persistence, membership/role enforcement, revision conflict checks, explicit CORS/trusted origins, and the documented `/api` contract. Remote deployment still requires the account owner to authenticate Wrangler and supply the exact development D1 ID.
 
+The cloud UI is available at `/login`, `/signup`, `/dashboard`, and `/editor/:siteId`. Dashboard workspace/site creation, local-project import confirmation, account navigation, cloud revision history, same-origin autosave, local recovery copies, and revision-conflict reload handling are implemented on top of the existing editor shell.
+
 - `src/main.ts` bootstraps the editor and keeps the existing shell behavior intact.
 - `src/editor/grapesjs-adapter.ts` owns the real GrapesJS dependency behind the `EditorAdapter` interface.
 - `src/models/project-schema.ts` and `src/storage/project-storage.ts` provide versioned project persistence with legacy local-storage backup.
