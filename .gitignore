@@ -2,4 +2,7 @@ node_modules/
 outputs/
 work/
 .sites-runtime/
+.dev.vars
+.env.local
+.wrangler/
 dist/assets/*.map

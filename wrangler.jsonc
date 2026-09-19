@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "webkiln-v10-api-dev",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ORIGIN": "http://localhost:4173",
+    "AUTH_URL": "http://localhost:8787",
+    "ENVIRONMENT": "development",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webkiln-v10-dev",
+      "migrations_dir": "worker/migrations",
+    },
+  ],
+}
