@@ -39,6 +39,9 @@ function ensurePages(project: WebKilnProject, initialData: unknown): void {
       slug: '/',
       projectData: initialData,
       updatedAt: new Date().toISOString(),
+      isHomepage: true,
+      seo: { title: 'Home', description: '' },
+      settings: { showInNavigation: true, passwordProtected: false },
     },
     {
       id: 'game-hosting',
@@ -46,6 +49,8 @@ function ensurePages(project: WebKilnProject, initialData: unknown): void {
       slug: '/game-hosting',
       projectData: null,
       updatedAt: new Date().toISOString(),
+      seo: { title: 'Game Hosting', description: '' },
+      settings: { showInNavigation: true, passwordProtected: false },
     },
     {
       id: 'support',
@@ -53,9 +58,12 @@ function ensurePages(project: WebKilnProject, initialData: unknown): void {
       slug: '/support',
       projectData: null,
       updatedAt: new Date().toISOString(),
+      seo: { title: 'Support', description: '' },
+      settings: { showInNavigation: true, passwordProtected: false },
     },
   ];
   project.currentPageId = 'home';
+  project.homepagePageId = 'home';
 }
 
 if (document.readyState === 'loading')

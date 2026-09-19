@@ -1,4 +1,4 @@
-import grapesjs, { type Component, type Editor } from 'grapesjs';
+import type { Component, Editor } from 'grapesjs';
 import type { DeviceId, EditorAdapter, EditorEventName } from '../types';
 
 const deviceMap: Record<DeviceId, string> = {
@@ -16,6 +16,7 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
 
   async initialize(): Promise<void> {
     if (this.editor) return;
+    const { default: grapesjs } = await import('grapesjs');
     const initialHtml = this.sourceContainer.innerHTML;
     const styles = await this.collectStyles();
     this.sourceContainer.innerHTML = '';

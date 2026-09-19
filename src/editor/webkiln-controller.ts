@@ -1,8 +1,9 @@
 import type { Component } from 'grapesjs';
 import { getComponentDefinition } from '../components-registry/registry';
-import type { DeviceId, PageDocument, WebKilnProject } from '../types';
+import type { DeviceId, WebKilnProject } from '../types';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { duplicatePage, newPage, removePage, restorePage, setHomepage, uniqueSlug } from '../models/page-manager';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -34,6 +35,9 @@ export class WebKilnEditorController {
   private saveTimer: number | undefined;
   private device: DeviceId = 'desktop';
   private previewing = false;
+  private expandedLayerIds = new Set<string>();
+  private clipboard: Component | null = null;
+  private draggedLayerId: string | null = null;
 
   constructor(
     private readonly adapter: GrapesJSEditorAdapter,
@@ -54,6 +58,7 @@ export class WebKilnEditorController {
     this.adapter.subscribe('device', (device) => this.setCanvasStatus(device as DeviceId));
     this.onSelect(this.adapter.getSelectedComponent());
     this.renderLayers();
+    this.renderPages();
     this.scheduleSave();
   }
 
@@ -103,6 +108,7 @@ export class WebKilnEditorController {
       .querySelector('#checkpointBtn')
       ?.addEventListener('click', () => this.saveNow('Named checkpoint'));
     this.bindCustomCode();
+    this.bindRecovery();
   }
 
   private bindBlocks(): void {
@@ -150,15 +156,21 @@ export class WebKilnEditorController {
 
   private bindPages(): void {
     document
-      .querySelectorAll<HTMLButtonElement>('.page-row')
-      .forEach((row) =>
-        row.addEventListener('click', () =>
-          this.switchPage(row.querySelector('strong')?.textContent ?? 'Home'),
-        ),
-      );
-    document
       .querySelector('#pagesPanel .mini-btn')
       ?.addEventListener('click', () => this.createPage());
+    document.querySelector('#pagesPanel')?.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-page-action]');
+      if (!button) return;
+      const page = this.project.pages.find((item) => item.id === button.dataset.pageId);
+      if (!page) return;
+      const action = button.dataset.pageAction;
+      if (action === 'open') this.switchPage(page.id);
+      if (action === 'home') { setHomepage(this.project, page.id); this.renderPages(); this.saveNow('Homepage changed'); }
+      if (action === 'duplicate') { const copy = duplicatePage(this.project, page); this.renderPages(); this.switchPage(copy.id); }
+      if (action === 'delete') this.deletePage(page.id);
+      if (action === 'up' || action === 'down') this.reorderPage(page.id, action === 'up' ? -1 : 1);
+      if (action === 'restore') { restorePage(this.project, page.id); this.renderPages(); this.saveNow('Page restored'); }
+    });
   }
 
   private bindInspector(): void {
@@ -208,10 +220,34 @@ export class WebKilnEditorController {
       document.querySelector('#layerList')?.classList.toggle('is-collapsed');
     });
     document.querySelector('#layerList')?.addEventListener('click', (event) => {
-      const row = (event.target as HTMLElement).closest<HTMLElement>('[data-component-id]');
+      const target = event.target as HTMLElement;
+      const action = target.closest<HTMLButtonElement>('[data-layer-action]');
+      const row = target.closest<HTMLElement>('[data-component-id]');
       if (!row) return;
       const component = this.findById(row.dataset.componentId ?? '');
-      if (component) this.adapter.selectComponent(component);
+      if (!component) return;
+      if (action) { this.layerAction(action.dataset.layerAction ?? '', component); return; }
+      if ((target as HTMLElement).closest('[data-layer-toggle]')) { this.toggleLayer(component.getId()); return; }
+      this.adapter.selectComponent(component);
+    });
+    document.querySelector('#layerList')?.addEventListener('dragstart', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('[data-component-id]');
+      if (row) this.draggedLayerId = row.dataset.componentId ?? null;
+    });
+    document.querySelector('#layerList')?.addEventListener('dragover', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('[data-component-id]');
+      if (!row || !this.draggedLayerId) return;
+      const target = this.findById(row.dataset.componentId ?? '');
+      const dragged = this.findById(this.draggedLayerId);
+      if (!target || !dragged || !this.canDrop(dragged, target)) return;
+      event.preventDefault(); row.dataset.dropValid = 'true';
+    });
+    document.querySelector('#layerList')?.addEventListener('drop', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('[data-component-id]');
+      const target = row && this.findById(row.dataset.componentId ?? '');
+      const dragged = this.draggedLayerId && this.findById(this.draggedLayerId);
+      if (target && dragged && this.canDrop(dragged, target)) { event.preventDefault(); dragged.move(target, { at: target.components().length }); this.scheduleSave(); }
+      this.draggedLayerId = null;
     });
   }
 
@@ -327,6 +363,24 @@ export class WebKilnEditorController {
       label.append(input);
       host.append(label);
     }
+    this.renderStyleGroup(host, 'Typography', ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align']);
+    this.renderStyleGroup(host, 'Layout', ['width', 'max-width', 'min-height', 'margin', 'padding', 'display', 'gap', 'justify-content', 'align-items']);
+    this.renderStyleGroup(host, 'Appearance', ['background-color', 'border', 'border-radius', 'box-shadow', 'opacity']);
+  }
+
+  private renderStyleGroup(host: HTMLElement, title: string, properties: string[]): void {
+    if (!this.selected) return;
+    const details = document.createElement('details'); details.open = title === 'Typography';
+    const summary = document.createElement('summary'); summary.textContent = title; details.append(summary);
+    const styles = this.selected.getStyle() as Record<string, string>;
+    properties.forEach((property) => {
+      const label = document.createElement('label'); label.className = 'field dynamic-field'; label.textContent = property;
+      const input = document.createElement('input'); input.value = styles[property] ?? ''; input.placeholder = 'Inherited';
+      input.addEventListener('input', () => this.selected && this.adapter.updateStyles(this.selected, { [property]: input.value }));
+      const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'mini-btn'; reset.textContent = 'Reset';
+      reset.addEventListener('click', () => { if (!this.selected) return; this.selected.setStyle({ [property]: '' }); input.value = ''; });
+      label.append(input, reset); details.append(label);
+    }); host.append(details);
   }
 
   private renderAdvancedControls(host: HTMLElement): void {
@@ -359,6 +413,9 @@ export class WebKilnEditorController {
     remove.onclick = () => this.deleteSelected();
     actions.append(duplicate, remove);
     host.append(actions);
+    const lock = document.createElement('button'); lock.className = 'mini-btn'; lock.textContent = this.isLocked(this.selected) ? 'Unlock element' : 'Lock element';
+    lock.onclick = () => { this.selected?.set('locked', !this.isLocked(this.selected)); this.renderLayers(); this.renderDynamicInspector('advanced'); };
+    host.append(lock);
   }
 
   private renderLayers(): void {
@@ -371,16 +428,55 @@ export class WebKilnEditorController {
   private layerNodes(components: Component[]): HTMLElement[] {
     return components.flatMap((component) => {
       const row = document.createElement('div');
-      row.className = `layer-row ${component === this.selected ? 'active' : ''}`;
+      row.className = `layer-row ${component === this.selected ? 'active' : ''} ${this.isLocked(component) ? 'locked' : ''}`;
       row.dataset.componentId = component.getId();
-      row.innerHTML = `<span class="layer-icon">${this.isContainer(component) ? '▦' : '◦'}</span><strong>${componentLabel(component)}</strong>`;
+      row.tabIndex = 0; row.draggable = true; row.setAttribute('role', 'treeitem');
+      const hasChildren = component.components().length > 0;
+      row.innerHTML = `<button class="layer-toggle" data-layer-toggle aria-label="${hasChildren ? 'Expand or collapse' : 'No children'}">${hasChildren ? (this.expandedLayerIds.has(component.getId()) ? '▾' : '▸') : '·'}</button><span class="layer-icon">${this.isContainer(component) ? '▦' : '◦'}</span><strong>${componentLabel(component)}</strong><span class="layer-actions"><button data-layer-action="up" aria-label="Move up">↑</button><button data-layer-action="down" aria-label="Move down">↓</button><button data-layer-action="hide" aria-label="Hide or show">${component.get('visible') === false ? '◌' : '◉'}</button><button data-layer-action="lock" aria-label="Lock or unlock">${this.isLocked(component) ? '🔒' : '⌑'}</button><button data-layer-action="duplicate" aria-label="Duplicate">＋</button><button data-layer-action="delete" aria-label="Delete">×</button></span>`;
+      row.querySelector('strong')?.addEventListener('dblclick', () => {
+        const next = window.prompt('Rename layer', componentLabel(component));
+        if (next?.trim()) { component.set('name', next.trim()); this.renderLayers(); this.scheduleSave(); }
+      });
       const children = component.components().models;
-      if (!children.length) return [row];
+      if (!children.length || !this.expandedLayerIds.has(component.getId())) return [row];
       const group = document.createElement('div');
       group.className = 'layer-children';
       group.append(...this.layerNodes(children));
       return [row, group];
     });
+  }
+
+  private toggleLayer(id: string): void {
+    if (this.expandedLayerIds.has(id)) this.expandedLayerIds.delete(id);
+    else this.expandedLayerIds.add(id);
+    this.renderLayers();
+  }
+
+  private isLocked(component: Component | null): boolean { return Boolean(component?.get('locked')); }
+
+  private isProtected(component: Component): boolean {
+    return component === this.adapter.getRoot() || String(component.get('tagName')) === 'body' || this.isLocked(component);
+  }
+
+  private canDrop(dragged: Component, target: Component): boolean {
+    return dragged !== target && !dragged.isChildOf(target) && this.isContainer(target) && !this.isProtected(dragged) && !this.isLocked(target);
+  }
+
+  private layerAction(action: string, component: Component): void {
+    if (action === 'hide') component.set('visible', component.get('visible') === false);
+    if (action === 'lock') component.set('locked', !this.isLocked(component));
+    if (action === 'duplicate' && !this.isProtected(component)) { this.adapter.selectComponent(component); this.duplicateSelected(); }
+    if (action === 'delete' && !this.isProtected(component)) { this.adapter.selectComponent(component); this.deleteSelected(); }
+    if (action === 'up' || action === 'down') this.moveLayer(component, action === 'up' ? -1 : 1);
+    this.renderLayers(); this.scheduleSave();
+  }
+
+  private moveLayer(component: Component, delta: number): void {
+    if (this.isProtected(component)) return;
+    const parent = component.parent(); if (!parent) return;
+    const siblings = parent.components().models; const index = siblings.indexOf(component); const next = index + delta;
+    if (next < 0 || next >= siblings.length) return;
+    component.move(parent, { at: next });
   }
 
   private findById(
@@ -452,18 +548,18 @@ export class WebKilnEditorController {
     if (button) button.textContent = this.previewing ? 'Exit preview' : 'Preview';
   }
 
-  private switchPage(name: string): void {
+  private switchPage(pageId: string): void {
     const current = this.project.pages.find((page) => page.id === this.project.currentPageId);
     if (current) {
       current.projectData = this.adapter.exportProjectData();
       current.updatedAt = new Date().toISOString();
     }
-    let destination = this.project.pages.find((page) => page.name === name);
+    let destination = this.project.pages.find((page) => page.id === pageId);
     if (!destination) {
       destination = {
-        id: name.toLowerCase().replace(/\s+/g, '-'),
-        name,
-        slug: `/${name.toLowerCase().replace(/\s+/g, '-')}`,
+        id: pageId,
+        name: pageId,
+        slug: uniqueSlug(this.project, pageId),
         projectData: null,
         updatedAt: new Date().toISOString(),
       };
@@ -472,31 +568,48 @@ export class WebKilnEditorController {
     this.project.currentPageId = destination.id;
     if (destination.projectData) this.adapter.loadProjectData(destination.projectData);
     else this.adapter.loadProjectData({ components: '<div class="site-canvas desktop"></div>' });
-    document.querySelector('.crumb span')?.replaceChildren(document.createTextNode(name));
-    document
-      .querySelectorAll('.page-row')
-      .forEach((row) => row.classList.toggle('active', row.textContent?.includes(name) ?? false));
+    document.querySelector('.crumb span')?.replaceChildren(document.createTextNode(destination.name));
+    this.renderPages();
     this.saveNow('Page switch');
   }
 
   private createPage(): void {
-    const number = this.project.pages.length + 1;
-    const name = `New page ${number}`;
-    const page: PageDocument = {
-      id: `page-${Date.now()}`,
-      name,
-      slug: `/page-${number}`,
-      projectData: null,
-      updatedAt: new Date().toISOString(),
-    };
+    const page = newPage(this.project, `New page ${this.project.pages.length + 1}`);
     this.project.pages.push(page);
-    const row = document.createElement('button');
-    row.className = 'page-row';
-    row.type = 'button';
-    row.innerHTML = `<span>▧</span><strong>${name}</strong><small>•••</small>`;
-    row.onclick = () => this.switchPage(name);
-    document.querySelector('#siteTree')?.before(row);
-    this.switchPage(name);
+    this.renderPages();
+    this.switchPage(page.id);
+  }
+
+  private renderPages(): void {
+    const panel = document.querySelector('#pagesPanel');
+    const tree = document.querySelector('#siteTree');
+    if (!panel || !tree) return;
+    panel.querySelectorAll('.page-row, .deleted-page-row').forEach((row) => row.remove());
+    [...this.project.pages].reverse().forEach((page) => {
+      const row = document.createElement('div'); row.className = `page-row ${page.id === this.project.currentPageId ? 'active' : ''}`;
+      row.innerHTML = `<button data-page-action="open" data-page-id="${page.id}" class="page-open"><span>▧</span><strong>${page.name}</strong><small>${page.isHomepage ? 'Home · ' : ''}${page.slug}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${page.id}" aria-label="Set homepage">⌂</button><button data-page-action="up" data-page-id="${page.id}">↑</button><button data-page-action="down" data-page-id="${page.id}">↓</button><button data-page-action="duplicate" data-page-id="${page.id}">＋</button><button data-page-action="delete" data-page-id="${page.id}">×</button></span>`;
+      tree.before(row);
+    });
+    this.project.deletedPages.forEach((page) => {
+      const row = document.createElement('div'); row.className = 'deleted-page-row';
+      row.innerHTML = `<span>↺ ${page.name}</span><button data-page-action="restore" data-page-id="${page.id}">Restore</button>`;
+      tree.before(row);
+    });
+  }
+
+  private deletePage(pageId: string): void {
+    if (this.project.pages.length <= 1) { this.toast('Keep one page', 'The last page cannot be deleted.'); return; }
+    const page = this.project.pages.find((item) => item.id === pageId);
+    if (!page || !window.confirm(`Move “${page.name}” to deleted pages?`)) return;
+    const removed = removePage(this.project, pageId); if (!removed) return;
+    this.renderPages(); this.switchPage(this.project.currentPageId);
+  }
+
+  private reorderPage(pageId: string, delta: number): void {
+    const index = this.project.pages.findIndex((page) => page.id === pageId); const next = index + delta;
+    if (index < 0 || next < 0 || next >= this.project.pages.length) return;
+    [this.project.pages[index], this.project.pages[next]] = [this.project.pages[next], this.project.pages[index]];
+    this.renderPages(); this.saveNow('Pages reordered');
   }
 
   private handleShortcut(event: KeyboardEvent): void {
@@ -509,10 +622,31 @@ export class WebKilnEditorController {
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       this.adapter.undo();
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && !typing) {
+      if (this.selected) { this.clipboard = this.selected.clone(); this.toast('Copied element', 'Paste it anywhere in the layer tree.'); }
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x' && !typing) {
+      if (this.selected && !this.isProtected(this.selected)) { this.clipboard = this.selected.clone(); this.deleteSelected(); }
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v' && !typing) {
+      event.preventDefault(); this.pasteClipboard();
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd' && !typing) {
+      event.preventDefault(); this.duplicateSelected();
     } else if (event.key === 'Delete' && !typing) {
       event.preventDefault();
       this.deleteSelected();
     }
+  }
+
+  private pasteClipboard(): void {
+    if (!this.clipboard) return;
+    const parent = this.selected && this.isContainer(this.selected) ? this.selected : this.selected?.parent() ?? undefined;
+    const copy = firstComponent(this.adapter.addComponent(this.clipboard.clone(), parent));
+    if (copy) { this.stripDuplicateIds(copy); this.adapter.selectComponent(copy); this.scheduleSave(); }
+  }
+
+  private stripDuplicateIds(component: Component): void {
+    const attrs = component.getAttributes() as Record<string, string>;
+    if (attrs.id) component.addAttributes({ id: `${attrs.id}-${Math.random().toString(36).slice(2, 7)}` });
+    component.components().models.forEach((child) => this.stripDuplicateIds(child));
   }
 
   private scheduleSave(): void {
@@ -564,6 +698,24 @@ export class WebKilnEditorController {
       if (modal) modal.hidden = true;
       this.toast('Sandbox code saved', 'Custom code remains isolated from the editor shell.');
     });
+  }
+
+  private bindRecovery(): void {
+    const backup = this.storage.getLegacyBackup();
+    if (!backup) return;
+    const card = document.createElement('div'); card.className = 'recovery-card';
+    card.innerHTML = `<strong>Legacy backup available</strong><small>${backup.key} · ${backup.value.length.toLocaleString()} characters</small><div><button type="button" data-recover="restore">Restore</button><button type="button" data-recover="export">Export</button></div>`;
+    card.addEventListener('click', (event) => {
+      const action = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-recover]')?.dataset.recover;
+      if (action === 'restore' && window.confirm('Restore the saved legacy backup? Current pages remain available in local storage.')) {
+        const restored = this.storage.restoreLatestLegacy(); if (restored) { window.location.reload(); }
+      }
+      if (action === 'export') {
+        const blob = new Blob([backup.value], { type: 'application/json' }); const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; link.download = `webkiln-${backup.key}-backup.json`; link.click(); URL.revokeObjectURL(url);
+      }
+    });
+    document.querySelector('#sitePanel')?.append(card);
   }
 
   private toast(title: string, detail: string): void {

@@ -14,12 +14,18 @@ export interface PageDocument {
   slug: string;
   projectData: unknown;
   updatedAt: string;
+  isHomepage?: boolean;
+  seo?: { title: string; description: string; canonical?: string };
+  settings?: { showInNavigation: boolean; passwordProtected: boolean };
+  deletedAt?: string;
 }
 
 export interface WebKilnProject {
-  schemaVersion: 1;
+  schemaVersion: 2;
   site: SiteMetadata;
   pages: PageDocument[];
+  deletedPages: PageDocument[];
+  homepagePageId: string;
   currentPageId: string;
   themeTokens: Record<string, string>;
   assets: Array<{ id: string; name: string; mime: string; size: number }>;

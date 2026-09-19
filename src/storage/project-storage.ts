@@ -6,6 +6,7 @@ export interface ProjectStorage {
   save(project: WebKilnProject): void;
   backupLegacy(key: string, value: string): void;
   restoreLatestLegacy(): WebKilnProject | null;
+  getLegacyBackup(): { key: string; value: string; savedAt: string } | null;
 }
 
 export class LocalProjectStorage implements ProjectStorage {
@@ -62,6 +63,14 @@ export class LocalProjectStorage implements ProjectStorage {
     project.currentPageId = project.pages[0]?.id ?? 'home';
     this.save(project);
     return project;
+  }
+
+  getLegacyBackup(): { key: string; value: string; savedAt: string } | null {
+    for (const key of ['webkiln-pages', 'webkiln-page', 'corrupt-project']) {
+      const value = localStorage.getItem(`${this.key}:legacy:${key}`);
+      if (value) return { key, value, savedAt: new Date().toISOString() };
+    }
+    return null;
   }
 
   private loadLegacyProject(): WebKilnProject | null {
