@@ -1,7 +1,11 @@
 import type { PageDocument, WebKilnProject } from '../types';
 
 export function slugify(value: string): string {
-  const slug = value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return slug || 'page';
 }
 
@@ -36,7 +40,10 @@ export function setHomepage(project: WebKilnProject, pageId: string): void {
 export function duplicatePage(project: WebKilnProject, source: PageDocument): PageDocument {
   const copy = newPage(project, `${source.name} copy`);
   copy.projectData = structuredClone(source.projectData);
-  copy.seo = { ...(source.seo ?? { title: copy.name, description: '' }), title: `${source.name} copy` };
+  copy.seo = {
+    ...(source.seo ?? { title: copy.name, description: '' }),
+    title: `${source.name} copy`,
+  };
   project.pages.push(copy);
   return copy;
 }
@@ -49,7 +56,8 @@ export function removePage(project: WebKilnProject, pageId: string): PageDocumen
   page.deletedAt = new Date().toISOString();
   project.deletedPages.push(page);
   if (project.homepagePageId === pageId) setHomepage(project, project.pages[0].id);
-  if (project.currentPageId === pageId) project.currentPageId = project.pages[Math.max(0, index - 1)].id;
+  if (project.currentPageId === pageId)
+    project.currentPageId = project.pages[Math.max(0, index - 1)].id;
   return page;
 }
 

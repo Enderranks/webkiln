@@ -3,6 +3,12 @@ import type { LocalProjectStorage } from './storage/project-storage';
 import type { WebKilnProject } from './types';
 
 declare global {
+  interface ImportMetaEnv {
+    readonly VITE_WEBKILN_API_URL?: string;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
   interface Window {
     WebKiln?: {
       adapter?: GrapesJSEditorAdapter;
