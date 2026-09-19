@@ -1,0 +1,5 @@
+node_modules/
+outputs/
+work/
+.sites-runtime/
+dist/assets/*.map

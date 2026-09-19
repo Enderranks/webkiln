@@ -30,6 +30,7 @@ document.querySelector('.project-switcher')?.addEventListener('click',()=>toastM
 document.querySelector('#helpBtn')?.addEventListener('click',()=>toastMessage('WebKiln help','Tip: select any section, then use the inspector or press Ctrl / Cmd + S to save.'));
 document.querySelectorAll('.inspector-tabs button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.inspector-tabs button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');toastMessage(btn.textContent+' controls','Inspector mode updated for the selected element.')}));
 document.querySelectorAll('.canvas-toolbar button').forEach(btn=>btn.addEventListener('click',()=>{const tool=btn.dataset.tool;if(tool==='duplicate')document.querySelector('.outline-btn')?.click();else toastMessage(btn.textContent.trim()+' mode','Use the inspector on the right to refine this selection.')}));
+window.select=select;window.snapshot=snapshot;window.restore=restore;window.setSaved=setSaved;window.addBlock=addBlock;window.wireSections=wireSections;window.toastMessage=toastMessage;
 const pageStoreKey='webkiln-pages';let currentPage=localStorage.getItem('webkiln-current-page')||'Home';let pageStore={Home:canvas.innerHTML,...JSON.parse(localStorage.getItem(pageStoreKey)||'{}')};
 const pageRows=[...document.querySelectorAll('.page-row')];
 function syncPageStore(){pageStore[currentPage]=canvas.innerHTML;localStorage.setItem(pageStoreKey,JSON.stringify(pageStore));localStorage.setItem('webkiln-current-page',currentPage)}
