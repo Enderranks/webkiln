@@ -393,6 +393,16 @@
 .cloud-conflict-card small {
   color: #f3aaa3;
 }
+
+.published-badge {
+  display: inline-block;
+  margin-left: 5px;
+  color: var(--cloud-success);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 #cloudSyncState {
   margin-right: 10px;
   color: var(--cloud-muted);

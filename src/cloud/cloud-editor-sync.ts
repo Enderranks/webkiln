@@ -52,6 +52,9 @@ export class CloudEditorSync {
   get remoteConflict(): SiteProject | null {
     return this.conflict;
   }
+  get currentRevision(): number {
+    return this.queue.currentRevision;
+  }
   reloadRemote(remote: SiteProject): void {
     Object.assign(this.project, remote.project);
     this.adapter.loadProjectData(

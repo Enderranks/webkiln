@@ -4,9 +4,26 @@ import { cors } from 'hono/cors';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { getAuth } from './auth';
 import { getDb } from './db/client';
-import { auditEvent, page, site, siteRevision, workspace, workspaceMembership } from './db/schema';
+import {
+  auditEvent,
+  page,
+  publishedRelease,
+  publishedSite,
+  site,
+  siteRevision,
+  workspace,
+  workspaceMembership,
+} from './db/schema';
 import type { Env } from './env';
 import { currentUser, requireMembership } from './security';
+import {
+  createPublishedSnapshot,
+  hashPassword,
+  normalizeSlug,
+  publicHtml,
+  type PublishedSnapshot,
+} from './publishing';
+import type { WebKilnProject } from '../../src/types';
 
 const app = new Hono<{ Bindings: Env }>();
 const jsonError = (
@@ -115,7 +132,14 @@ app.get('/api/workspaces/:workspaceId/sites', async (c) => {
     .where(eq(site.workspaceId, c.req.param('workspaceId')))
     .orderBy(desc(site.updatedAt))
     .all();
-  return c.json(rows);
+  const published = await getDb(c.env.DB)
+    .select({ siteId: publishedSite.siteId, releaseId: publishedSite.currentReleaseId })
+    .from(publishedSite)
+    .all();
+  const publishedIds = new Set(
+    published.filter((item) => item.releaseId).map((item) => item.siteId),
+  );
+  return c.json(rows.map((item) => ({ ...item, published: publishedIds.has(item.id) })));
 });
 
 app.post('/api/workspaces/:workspaceId/sites', async (c) => {
@@ -520,12 +544,404 @@ app.post('/api/sites/:siteId/revisions/:revisionId/restore', async (c) => {
   });
 });
 
+app.get('/api/sites/:siteId/publish-status', async (c) => {
+  const record = await getSiteAccess(c, 'viewer');
+  if ('error' in record) return record.response;
+  const db = getDb(c.env.DB);
+  const current = await db
+    .select()
+    .from(publishedSite)
+    .where(eq(publishedSite.siteId, record.site.id))
+    .get();
+  const releases = await db
+    .select({
+      id: publishedRelease.id,
+      releaseNumber: publishedRelease.releaseNumber,
+      sourceRevision: publishedRelease.sourceRevision,
+      createdBy: publishedRelease.createdBy,
+      createdAt: publishedRelease.createdAt,
+    })
+    .from(publishedRelease)
+    .where(eq(publishedRelease.siteId, record.site.id))
+    .orderBy(desc(publishedRelease.releaseNumber))
+    .all();
+  return c.json({
+    published: Boolean(current?.currentReleaseId),
+    currentReleaseId: current?.currentReleaseId ?? null,
+    publishedAt: current?.publishedAt?.toISOString() ?? null,
+    publicUrl: current?.currentReleaseId ? publicSiteUrl(c, record.site.slug) : null,
+    releases,
+  });
+});
+
+app.post('/api/sites/:siteId/publish', async (c) => {
+  const record = await getSiteAccess(c, 'editor');
+  if ('error' in record) return record.response;
+  const body = await c.req.json<{ expectedRevision?: number; password?: string }>();
+  if (body.expectedRevision !== undefined && body.expectedRevision !== record.site.currentRevision)
+    return jsonError(c, 409, 'REVISION_MISMATCH', 'The project changed on the server');
+  const db = getDb(c.env.DB);
+  const rows = await db
+    .select()
+    .from(page)
+    .where(and(eq(page.siteId, record.site.id), isNull(page.deletedAt)))
+    .orderBy(asc(page.sortOrder))
+    .all();
+  const project = projectFromRows(record.site, rows);
+  const protectedPages = rows.some((item) => item.passwordProtected);
+  const existing = await db
+    .select()
+    .from(publishedSite)
+    .where(eq(publishedSite.siteId, record.site.id))
+    .get();
+  if (protectedPages && !body.password && !existing?.passwordHash)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'A password is required for protected pages');
+  if (JSON.stringify(project).length > 8 * 1024 * 1024)
+    return jsonError(c, 413, 'VALIDATION_ERROR', 'Project payload is too large to publish');
+  const now = new Date();
+  const snapshot = createPublishedSnapshot(project, now.toISOString());
+  const previous = await db
+    .select({ releaseNumber: publishedRelease.releaseNumber })
+    .from(publishedRelease)
+    .where(eq(publishedRelease.siteId, record.site.id))
+    .orderBy(desc(publishedRelease.releaseNumber))
+    .get();
+  const releaseNumber = (previous?.releaseNumber ?? 0) + 1;
+  const release = {
+    id: crypto.randomUUID(),
+    siteId: record.site.id,
+    releaseNumber,
+    sourceRevision: record.site.currentRevision,
+    snapshotData: JSON.stringify(snapshot),
+    createdBy: record.user.id,
+    createdAt: now,
+  };
+  const passwordHash = body.password
+    ? await hashPassword(body.password)
+    : (existing?.passwordHash ?? null);
+  await db.batch([
+    db.insert(publishedRelease).values(release),
+    existing
+      ? db
+          .update(publishedSite)
+          .set({ currentReleaseId: release.id, passwordHash, publishedAt: now, updatedAt: now })
+          .where(eq(publishedSite.siteId, record.site.id))
+      : db.insert(publishedSite).values({
+          siteId: record.site.id,
+          currentReleaseId: release.id,
+          passwordHash,
+          publishedAt: now,
+          updatedAt: now,
+        }),
+    db.insert(auditEvent).values({
+      id: crypto.randomUUID(),
+      workspaceId: record.site.workspaceId,
+      userId: record.user.id,
+      siteId: record.site.id,
+      action: 'site.published',
+      resourceType: 'published_release',
+      resourceId: release.id,
+      metadata: JSON.stringify({ releaseNumber, sourceRevision: record.site.currentRevision }),
+      createdAt: now,
+    }),
+  ]);
+  return c.json(
+    {
+      published: true,
+      releaseId: release.id,
+      releaseNumber,
+      sourceRevision: release.sourceRevision,
+      publishedAt: now.toISOString(),
+      publicUrl: publicSiteUrl(c, record.site.slug),
+    },
+    201,
+  );
+});
+
+app.post('/api/sites/:siteId/unpublish', async (c) => {
+  const record = await getSiteAccess(c, 'editor');
+  if ('error' in record) return record.response;
+  const now = new Date();
+  await getDb(c.env.DB)
+    .update(publishedSite)
+    .set({ currentReleaseId: null, publishedAt: null, passwordHash: null, updatedAt: now })
+    .where(eq(publishedSite.siteId, record.site.id));
+  return c.json({ published: false });
+});
+
+app.post('/api/sites/:siteId/publish/:releaseId/rollback', async (c) => {
+  const record = await getSiteAccess(c, 'editor');
+  if ('error' in record) return record.response;
+  const db = getDb(c.env.DB);
+  const selected = await db
+    .select()
+    .from(publishedRelease)
+    .where(
+      and(
+        eq(publishedRelease.id, c.req.param('releaseId')),
+        eq(publishedRelease.siteId, record.site.id),
+      ),
+    )
+    .get();
+  if (!selected) return jsonError(c, 404, 'NOT_FOUND', 'Published release not found');
+  const current = await db
+    .select()
+    .from(publishedSite)
+    .where(eq(publishedSite.siteId, record.site.id))
+    .get();
+  const previous = await db
+    .select({ releaseNumber: publishedRelease.releaseNumber })
+    .from(publishedRelease)
+    .where(eq(publishedRelease.siteId, record.site.id))
+    .orderBy(desc(publishedRelease.releaseNumber))
+    .get();
+  const now = new Date();
+  const release = {
+    id: crypto.randomUUID(),
+    siteId: record.site.id,
+    releaseNumber: (previous?.releaseNumber ?? 0) + 1,
+    sourceRevision: selected.sourceRevision,
+    snapshotData: selected.snapshotData,
+    createdBy: record.user.id,
+    createdAt: now,
+  };
+  await db.batch([
+    db.insert(publishedRelease).values(release),
+    current
+      ? db
+          .update(publishedSite)
+          .set({ currentReleaseId: release.id, publishedAt: now, updatedAt: now })
+          .where(eq(publishedSite.siteId, record.site.id))
+      : db.insert(publishedSite).values({
+          siteId: record.site.id,
+          currentReleaseId: release.id,
+          publishedAt: now,
+          updatedAt: now,
+        }),
+  ]);
+  return c.json({
+    published: true,
+    releaseId: release.id,
+    releaseNumber: release.releaseNumber,
+    rolledBackTo: selected.id,
+    publicUrl: publicSiteUrl(c, record.site.slug),
+  });
+});
+
+app.get('/sites/:siteSlug/sitemap.xml', async (c) => {
+  const published = await getPublishedSite(c, c.req.param('siteSlug'));
+  if (!published) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const snapshot = published.snapshot;
+  const base = publicSiteUrl(c, published.site.slug);
+  const urls = snapshot.pages
+    .filter((item) => item.slug !== '/404')
+    .map(
+      (item) =>
+        `<url><loc>${escapeXml(`${base}${item.slug === '/' ? '' : item.slug}`)}</loc></url>`,
+    )
+    .join('');
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`,
+    {
+      headers: {
+        'Content-Type': 'application/xml; charset=UTF-8',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    },
+  );
+});
+
+app.post('/sites/:siteSlug/__access', async (c) => {
+  const published = await getPublishedSite(c, c.req.param('siteSlug'));
+  if (!published?.published.passwordHash)
+    return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const form = await c.req.parseBody();
+  const password = typeof form.password === 'string' ? form.password : '';
+  if (!password || (await hashPassword(password)) !== published.published.passwordHash)
+    return publicHtmlResponse(
+      c,
+      '<main><h1>Incorrect password</h1><p>Please go back and try again.</p></main>',
+      403,
+    );
+  const token = await createAccessToken(c.env.BETTER_AUTH_SECRET, published.site.id);
+  const target = new URL(c.req.url);
+  target.pathname = `/sites/${published.site.slug}`;
+  target.search = '';
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: target.toString(),
+      'Set-Cookie': `wk_public_access=${token}; Path=/sites/${published.site.slug}; Max-Age=86400; HttpOnly; Secure; SameSite=Lax`,
+    },
+  });
+});
+
+app.get('/sites/:siteSlug', async (c) => renderPublicPage(c, c.req.param('siteSlug'), '/'));
+app.get('/sites/:siteSlug/:pageSlug', async (c) =>
+  renderPublicPage(c, c.req.param('siteSlug'), normalizeSlug(c.req.param('pageSlug'))),
+);
+
 app.notFound((c) => {
   if (new URL(c.req.url).pathname.startsWith('/api/')) {
     return jsonError(c, 404, 'NOT_FOUND', 'API route not found');
   }
   return c.env.ASSETS.fetch(c.req.raw);
 });
+
+async function renderPublicPage(
+  c: Context<{ Bindings: Env }>,
+  siteSlug: string,
+  pageSlug: string,
+): Promise<Response> {
+  const published = await getPublishedSite(c, siteSlug);
+  if (!published) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const foundPage = published.snapshot.pages.find((item) => item.slug === pageSlug);
+  const page = foundPage ?? published.snapshot.custom404;
+  const hasAccess =
+    !published.published.passwordHash ||
+    (await validAccessToken(c, published.site.id, c.env.BETTER_AUTH_SECRET));
+  const html = publicHtml(
+    published.snapshot,
+    page,
+    publicSiteUrl(c, published.site.slug),
+    Boolean(published.published.passwordHash) && !hasAccess,
+  );
+  return publicHtmlResponse(c, html, foundPage ? 200 : 404);
+}
+
+async function getPublishedSite(c: Context<{ Bindings: Env }>, siteSlug: string) {
+  const slug = siteSlug.toLowerCase();
+  const record = await getDb(c.env.DB)
+    .select({ site, published: publishedSite, release: publishedRelease })
+    .from(site)
+    .innerJoin(publishedSite, eq(publishedSite.siteId, site.id))
+    .innerJoin(publishedRelease, eq(publishedRelease.id, publishedSite.currentReleaseId))
+    .where(eq(site.slug, slug))
+    .get();
+  if (!record || !record.published.currentReleaseId) return null;
+  return {
+    site: record.site,
+    published: record.published,
+    snapshot: JSON.parse(record.release.snapshotData) as PublishedSnapshot,
+  };
+}
+
+function publicHtmlResponse(
+  c: Context<{ Bindings: Env }>,
+  html: string,
+  status: 200 | 403 | 404,
+): Response {
+  const response = c.html(html, status);
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'",
+  );
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  return response;
+}
+
+function publicSiteUrl(c: Context<{ Bindings: Env }>, slug: string): string {
+  return `${new URL(c.req.url).origin}/sites/${encodeURIComponent(slug)}`;
+}
+function escapeXml(value: string): string {
+  return value.replace(
+    /[<>&'"]/g,
+    (character) =>
+      ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[character] ??
+      character,
+  );
+}
+function readCookie(c: Context<{ Bindings: Env }>, name: string): string | null {
+  const raw = c.req.header('Cookie') ?? '';
+  const item = raw
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  return item ? decodeURIComponent(item.slice(name.length + 1)) : null;
+}
+async function createAccessToken(secret: string, siteId: string): Promise<string> {
+  const expires = Date.now() + 86400000;
+  const data = `${siteId}.${expires}`;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+  return `${btoa(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.${btoa(
+    String.fromCharCode(...new Uint8Array(signature)),
+  )
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')}`;
+}
+async function validAccessToken(
+  c: Context<{ Bindings: Env }>,
+  siteId: string,
+  secret: string,
+): Promise<boolean> {
+  const token = readCookie(c, 'wk_public_access');
+  if (!token) return false;
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return false;
+  try {
+    const data = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+    const [tokenSite, expires] = data.split('.');
+    if (tokenSite !== siteId || Number(expires) < Date.now()) return false;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+    const bytes = Uint8Array.from(
+      atob(signature.replace(/-/g, '+').replace(/_/g, '/')),
+      (character) => character.charCodeAt(0),
+    );
+    return crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(data));
+  } catch {
+    return false;
+  }
+}
+
+function projectFromRows(
+  record: typeof site.$inferSelect,
+  rows: Array<typeof page.$inferSelect>,
+): WebKilnProject {
+  return {
+    schemaVersion: 2,
+    site: { id: record.id, title: record.name, description: '', language: 'en', timezone: 'UTC' },
+    pages: rows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      slug: item.slug,
+      projectData: JSON.parse(item.projectData),
+      updatedAt: new Date(item.updatedAt).toISOString(),
+      isHomepage: item.homepage,
+      seo: {
+        title: item.seoTitle,
+        description: item.seoDescription,
+        canonical: item.canonicalUrl ?? undefined,
+      },
+      settings: {
+        showInNavigation: item.showInNavigation,
+        passwordProtected: item.passwordProtected,
+      },
+    })),
+    deletedPages: [],
+    currentPageId: rows.find((item) => item.homepage)?.id ?? rows[0]?.id ?? 'home',
+    homepagePageId: rows.find((item) => item.homepage)?.id ?? rows[0]?.id ?? 'home',
+    themeTokens: JSON.parse(record.themeData),
+    assets: [],
+    customCode: { html: '', css: '', javascript: '', isolated: true },
+    revisions: [],
+  };
+}
 
 function toPage(item: typeof page.$inferSelect) {
   return {

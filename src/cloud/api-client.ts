@@ -6,6 +6,8 @@ import type {
   Session,
   SiteProject,
   SiteRevision,
+  PublishResult,
+  PublishStatus,
   SaveProjectRequest,
   Workspace,
 } from './contracts';
@@ -128,6 +130,24 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
     return this.request(
       `/api/sites/${encodeURIComponent(siteId)}/revisions/${encodeURIComponent(revisionId)}/restore`,
       { method: 'POST', body: JSON.stringify({ expectedRevision }) },
+    );
+  }
+  getPublishStatus(siteId: string): Promise<PublishStatus> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/publish-status`);
+  }
+  publishSite(siteId: string, expectedRevision: number, password?: string): Promise<PublishResult> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ expectedRevision, ...(password ? { password } : {}) }),
+    });
+  }
+  unpublishSite(siteId: string): Promise<PublishResult> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/unpublish`, { method: 'POST' });
+  }
+  rollbackPublishedSite(siteId: string, releaseId: string): Promise<PublishResult> {
+    return this.request(
+      `/api/sites/${encodeURIComponent(siteId)}/publish/${encodeURIComponent(releaseId)}/rollback`,
+      { method: 'POST' },
     );
   }
 }

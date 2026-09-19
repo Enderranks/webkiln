@@ -136,3 +136,34 @@ export const auditEvent = sqliteTable(
     auditWorkspaceLookup: index('audit_workspace_lookup').on(table.workspaceId, table.createdAt),
   }),
 );
+
+export const publishedRelease = sqliteTable(
+  'published_release',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id').notNull(),
+    releaseNumber: integer('release_number').notNull(),
+    sourceRevision: integer('source_revision').notNull(),
+    snapshotData: text('snapshot_data').notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    releaseUnique: uniqueIndex('published_release_unique').on(table.siteId, table.releaseNumber),
+    releaseSiteLookup: index('published_release_site_lookup').on(table.siteId, table.createdAt),
+  }),
+);
+
+export const publishedSite = sqliteTable(
+  'published_site',
+  {
+    siteId: text('site_id').primaryKey(),
+    currentReleaseId: text('current_release_id'),
+    passwordHash: text('password_hash'),
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    currentReleaseLookup: index('published_site_release_lookup').on(table.currentReleaseId),
+  }),
+);

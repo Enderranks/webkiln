@@ -39,6 +39,7 @@ export interface CloudSite {
   pageCount: number;
   updatedAt: string;
   updatedBy: string;
+  published?: boolean;
 }
 export interface SiteProject {
   site: CloudSite;
@@ -54,6 +55,29 @@ export interface SiteRevision {
   createdBy: string;
   createdAt: string;
   restoreSourceRevision?: number;
+}
+export interface PublishedRelease {
+  id: string;
+  releaseNumber: number;
+  sourceRevision: number;
+  createdBy: string;
+  createdAt: string;
+}
+export interface PublishStatus {
+  published: boolean;
+  currentReleaseId: string | null;
+  publishedAt: string | null;
+  publicUrl: string | null;
+  releases: PublishedRelease[];
+}
+export interface PublishResult {
+  published: boolean;
+  releaseId?: string;
+  releaseNumber?: number;
+  sourceRevision?: number;
+  publishedAt?: string;
+  publicUrl?: string;
+  rolledBackTo?: string;
 }
 export interface SaveProjectRequest {
   project: WebKilnProject;

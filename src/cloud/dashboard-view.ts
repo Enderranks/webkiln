@@ -80,7 +80,7 @@ export async function renderDashboard(
       ? sites
           .map(
             (site) =>
-              `<button class="site-card" data-site-id="${escapeHtml(site.id)}"><span class="site-icon">◈</span><span><strong>${escapeHtml(site.name)}</strong><small>${site.pageCount} pages · revision ${site.currentRevision}</small></span><span>→</span></button>`,
+              `<button class="site-card" data-site-id="${escapeHtml(site.id)}"><span class="site-icon">◈</span><span><strong>${escapeHtml(site.name)} ${site.published ? '<em class="published-badge">Published</em>' : ''}</strong><small>${site.pageCount} pages · revision ${site.currentRevision}</small></span><span>→</span></button>`,
           )
           .join('')
       : '<div class="empty-state"><strong>No sites yet.</strong><small>Create your first cloud site to start syncing.</small></div>';

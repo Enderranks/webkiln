@@ -93,6 +93,8 @@ async function bootEditor(siteId?: string, remote?: SiteProject): Promise<void> 
       );
       sync.start();
       void renderRevisions(cloud, siteId, remote.serverRevision);
+      void renderPublishPanel(cloud, siteId, remote.serverRevision);
+      bindPublishButton(cloud, siteId, sync);
       window.WebKiln.cloudSync = sync;
     }
     document.documentElement.dataset.editorEngine = 'grapesjs';
@@ -103,6 +105,116 @@ async function bootEditor(siteId?: string, remote?: SiteProject): Promise<void> 
     document.documentElement.dataset.editorEngine = 'grapesjs-error';
     document.querySelector('#saveState')?.replaceChildren(document.createTextNode('Editor error'));
     console.error(error);
+  }
+}
+
+function bindPublishButton(client: WebKilnApiClient, siteId: string, sync: CloudEditorSync): void {
+  document.querySelector('#publishBtn')?.addEventListener(
+    'click',
+    (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openPublishDialog(client, siteId, sync);
+    },
+    true,
+  );
+}
+
+function openPublishDialog(client: WebKilnApiClient, siteId: string, sync: CloudEditorSync): void {
+  document.querySelector('[data-publish-dialog]')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.dataset.publishDialog = 'true';
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML =
+    '<section class="setup-modal publish-modal" role="dialog" aria-modal="true" aria-labelledby="publishTitle"><div class="modal-head"><div><p class="eyebrow">Public website</p><h2 id="publishTitle">Publish this version?</h2></div><button class="mini-btn" data-close-publish type="button" aria-label="Close publish dialog">×</button></div><p class="modal-copy">WebKiln will create an immutable published snapshot. Existing public visitors keep seeing the current version until you confirm.</p><label class="field">Optional site password<input data-publish-password type="password" autocomplete="new-password" placeholder="Leave blank for public access" /></label><p class="cloud-error" data-publish-error hidden></p><div class="modal-actions"><button class="ghost-btn" data-close-publish type="button">Cancel</button><button class="primary-btn" data-confirm-publish type="button">Publish version</button></div></section>';
+  document.body.append(backdrop);
+  const close = () => backdrop.remove();
+  backdrop
+    .querySelectorAll('[data-close-publish]')
+    .forEach((button) => button.addEventListener('click', close));
+  backdrop.querySelector('[data-confirm-publish]')?.addEventListener('click', async () => {
+    const button = backdrop.querySelector<HTMLButtonElement>('[data-confirm-publish]');
+    const error = backdrop.querySelector<HTMLElement>('[data-publish-error]');
+    const password = backdrop.querySelector<HTMLInputElement>('[data-publish-password]')?.value;
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Publishing…';
+    }
+    try {
+      const result = await client.publishSite(siteId, sync.currentRevision, password);
+      close();
+      renderSyncState('saved');
+      showToast(
+        'Site published',
+        result.publicUrl ? `Public at ${result.publicUrl}` : 'Your latest version is live.',
+      );
+      void renderPublishPanel(client, siteId, sync.currentRevision);
+    } catch (publishError) {
+      if (error) {
+        error.textContent =
+          publishError instanceof Error ? publishError.message : 'Publishing failed.';
+        error.hidden = false;
+      }
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Publish version';
+      }
+    }
+  });
+}
+
+async function renderPublishPanel(
+  client: WebKilnApiClient,
+  siteId: string,
+  _revision: number,
+): Promise<void> {
+  const panel = document.querySelector('#sitePanel');
+  if (!panel) return;
+  panel.querySelector('[data-publish-panel]')?.remove();
+  const card = document.createElement('div');
+  card.dataset.publishPanel = 'true';
+  card.className = 'recovery-card publish-panel';
+  card.innerHTML =
+    '<strong>Public website</strong><small>Loading publish history…</small><div data-publish-history></div>';
+  panel.append(card);
+  try {
+    const status = await client.getPublishStatus(siteId);
+    const history = card.querySelector<HTMLElement>('[data-publish-history]');
+    const statusLine = status.published
+      ? `Published · ${new Date(status.publishedAt ?? '').toLocaleString()}`
+      : 'Draft only · not public';
+    card.querySelector('small')!.textContent = statusLine;
+    if (history)
+      history.innerHTML = status.releases.length
+        ? status.releases
+            .slice(0, 8)
+            .map(
+              (release) =>
+                `<div class="revision-row"><span><b>Release ${release.releaseNumber}</b>${release.id === status.currentReleaseId ? ' · Live' : ''}<small>Source revision ${release.sourceRevision} · ${new Date(release.createdAt).toLocaleString()}</small></span>${release.id !== status.currentReleaseId ? `<button type="button" data-rollback="${escapeHtml(release.id)}">Rollback</button>` : ''}</div>`,
+            )
+            .join('')
+        : '<small>No published versions yet.</small>';
+    history?.querySelectorAll<HTMLButtonElement>('[data-rollback]').forEach((button) =>
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        await client.rollbackPublishedSite(siteId, button.dataset.rollback ?? '');
+        await renderPublishPanel(client, siteId, _revision);
+        showToast('Published version restored', 'The selected immutable release is live again.');
+      }),
+    );
+    if (status.published) {
+      const unpublish = document.createElement('button');
+      unpublish.type = 'button';
+      unpublish.textContent = 'Unpublish';
+      unpublish.addEventListener('click', async () => {
+        await client.unpublishSite(siteId);
+        await renderPublishPanel(client, siteId, _revision);
+        showToast('Site unpublished', 'The public URL now returns not found.');
+      });
+      card.append(unpublish);
+    }
+  } catch {
+    card.querySelector('small')!.textContent = 'Publish history unavailable.';
   }
 }
 

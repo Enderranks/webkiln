@@ -59,6 +59,9 @@ export class CloudAutosaveQueue {
   get pendingProject(): WebKilnProject | null {
     return this.pending;
   }
+  get currentRevision(): number {
+    return this.revision;
+  }
   unblockWithRevision(revision: number): void {
     this.revision = revision;
     this.blockedByConflict = false;
