@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d0f" />
+  <meta name="description" content="WebKiln is a focused visual website builder for hosting businesses and their clients." />
+  <title>WebKiln — Website Editor</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d0f'/%3E%3Cpath d='M13 18l9 30 10-20 10 20 9-30' fill='none' stroke='%23d6ad61' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="preview.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="WebKiln home">
+      <span class="brand-mark">W</span>
+      <span>WEBKILN</span>
+    </div>
+    <button class="project-switcher" type="button">Underline Hosting <span>⌄</span></button>
+    <div class="history-controls" aria-label="Edit history">
+      <button id="undoBtn" class="icon-btn" type="button" title="Undo" aria-label="Undo">↶</button>
+      <button id="redoBtn" class="icon-btn" type="button" title="Redo" aria-label="Redo">↷</button>
+    </div>
+    <div class="device-controls" aria-label="Preview size">
+      <button class="device active" data-width="desktop" type="button" aria-label="Desktop preview">▰</button>
+      <button class="device" data-width="tablet" type="button" aria-label="Tablet preview">▯</button>
+      <button class="device" data-width="mobile" type="button" aria-label="Mobile preview">▯</button>
+    </div>
+    <div class="top-actions">
+      <span id="saveState" class="save-state"><i></i> Saved</span>
+      <button id="previewBtn" class="ghost-btn" type="button">Preview</button>
+      <button id="publishBtn" class="primary-btn" type="button">Publish site</button>
+    </div>
+  </header>
+
+  <main class="editor-shell">
+    <aside class="left-rail">
+      <nav class="rail-tabs" aria-label="Editor tools">
+        <button class="rail-tab active" data-panel="blocks" type="button"><span>＋</span>Build</button>
+        <button class="rail-tab" data-panel="pages" type="button"><span>▤</span>Pages</button>
+        <button class="rail-tab" data-panel="theme" type="button"><span>◐</span>Theme</button>
+      </nav>
+
+      <section class="panel active" id="blocksPanel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Library</p><h1>Add sections</h1></div>
+          <button class="mini-btn" type="button" title="Close panel">×</button>
+        </div>
+        <label class="search"><span>⌕</span><input id="blockSearch" type="search" placeholder="Search blocks" /></label>
+        <div class="category-row">
+          <button class="chip active" data-filter="all" type="button">All</button>
+          <button class="chip" data-filter="layout" type="button">Layout</button>
+          <button class="chip" data-filter="commerce" type="button">Commerce</button>
+        </div>
+        <div id="blockList" class="block-list">
+          <button class="block-card" draggable="true" data-type="hero" data-category="layout" type="button"><span class="block-preview hero-preview"><i></i><b></b></span><strong>Hero</strong><small>Headline, copy and action</small></button>
+          <button class="block-card" draggable="true" data-type="features" data-category="layout" type="button"><span class="block-preview cards-preview"><i></i><i></i><i></i></span><strong>Feature grid</strong><small>Three benefit cards</small></button>
+          <button class="block-card" draggable="true" data-type="pricing" data-category="commerce" type="button"><span class="block-preview price-preview"><i></i><i></i><i></i></span><strong>Pricing plans</strong><small>Plans with checkout buttons</small></button>
+          <button class="block-card" draggable="true" data-type="games" data-category="commerce" type="button"><span class="block-preview games-preview"><i></i><i></i></span><strong>Game selector</strong><small>Searchable hosting catalog</small></button>
+          <button class="block-card" draggable="true" data-type="quote" data-category="commerce" type="button"><span class="block-preview quote-preview"><i></i><b></b></span><strong>Custom quote</strong><small>Live price estimate form</small></button>
+          <button class="block-card" draggable="true" data-type="footer" data-category="layout" type="button"><span class="block-preview footer-preview"><i></i><b></b></span><strong>Footer</strong><small>Links and legal details</small></button>
+        </div>
+      </section>
+
+      <section class="panel" id="pagesPanel">
+        <div class="panel-heading"><div><p class="eyebrow">Structure</p><h1>Pages</h1></div><button class="mini-btn" type="button">＋</button></div>
+        <button class="page-row active" type="button"><span>⌂</span><strong>Home</strong><small>•••</small></button>
+        <button class="page-row" type="button"><span>▧</span><strong>Game Hosting</strong><small>•••</small></button>
+        <button class="page-row" type="button"><span>▧</span><strong>Support</strong><small>•••</small></button>
+        <p class="panel-note">Drag pages to reorder your navigation.</p>
+      </section>
+
+      <section class="panel" id="themePanel">
+        <div class="panel-heading"><div><p class="eyebrow">Brand</p><h1>Site theme</h1></div></div>
+        <label class="field">Primary color<input id="themeColor" type="color" value="#d6ad61" /></label>
+        <label class="field">Corner style<select id="radiusSelect"><option value="4">Sharp</option><option value="10" selected>Soft</option><option value="20">Round</option></select></label>
+        <label class="field">Heading font<select><option>Space Grotesk</option><option>DM Sans</option></select></label>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="workspace-bar">
+        <div class="crumb"><span>Home</span><b>/</b><strong id="selectionLabel">Page</strong></div>
+        <div class="zoom"><button id="zoomOut" type="button">−</button><span id="zoomValue">90%</span><button id="zoomIn" type="button">＋</button></div>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <div class="site-canvas desktop" id="siteCanvas" aria-label="Website canvas">
+          <nav class="demo-nav section-block selected" data-name="Navigation" tabindex="0">
+            <a class="demo-brand" href="#" onclick="return false">UNDERLINE<span></span></a>
+            <div class="demo-links"><a href="#" onclick="return false">Home</a><a href="#" onclick="return false">Game Servers</a><a href="#" onclick="return false">Network</a><a href="#" onclick="return false">Support</a></div>
+            <button type="button">Get Started</button>
+            <div class="selection-tag">Navigation</div>
+          </nav>
+          <section class="demo-hero section-block" data-name="Hero" tabindex="0">
+            <div class="hero-content"><span class="overline">HIGH-PERFORMANCE GAME HOSTING</span><h2 contenteditable="true">Power your<br />next world.</h2><p contenteditable="true">Fast, reliable servers for creators and communities. Deploy in under a minute.</p><div class="hero-actions"><button type="button">Choose your game</button><button class="secondary" type="button">View control panel</button></div><div class="trust-row"><span><b>99.99%</b> uptime</span><span><b>24/7</b> support</span><span><b>Instant</b> setup</span></div></div>
+            <div class="server-visual"><div class="rack"><i></i><i></i><i></i><i></i><i></i><span>UNDERLINE</span></div><div class="status-card"><em></em><strong>All systems operational</strong><small>Global network</small></div></div>
+          </section>
+          <div class="drop-zone" id="dropZone">Drop a section here</div>
+          <section class="demo-plans section-block" data-name="Pricing plans" tabindex="0">
+            <div class="section-intro"><span class="overline">SIMPLE PRICING</span><h3 contenteditable="true">Built for every kind of world.</h3><p>Start small and scale whenever your community grows.</p></div>
+            <div class="plan-grid">
+              <article><small>STARTER</small><h4>$4.99<span>/mo</span></h4><p>2 GB RAM · 10 GB NVMe</p><button type="button">Choose Starter</button></article>
+              <article class="featured"><div class="popular">MOST POPULAR</div><small>COMMUNITY</small><h4>$9.99<span>/mo</span></h4><p>4 GB RAM · 25 GB NVMe</p><button type="button">Choose Community</button></article>
+              <article><small>PRO</small><h4>$19.99<span>/mo</span></h4><p>8 GB RAM · 50 GB NVMe</p><button type="button">Choose Pro</button></article>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <div class="inspector-head"><div><p class="eyebrow">Selected</p><h2 id="inspectorTitle">Navigation</h2></div><button id="deleteBtn" class="mini-btn danger" type="button" title="Delete section">⌫</button></div>
+      <div class="property-group"><h3>Layout</h3><div class="segmented"><button class="active" type="button">Full</button><button type="button">Boxed</button></div><label class="field">Section spacing<input id="spacingRange" type="range" min="20" max="120" value="60" /><span id="spacingValue">60 px</span></label></div>
+      <div class="property-group"><h3>Appearance</h3><label class="field">Background<div class="color-input"><input id="bgColor" type="color" value="#0b0d0f" /><span id="bgValue">#0B0D0F</span></div></label><label class="field">Text color<div class="color-input"><input id="textColor" type="color" value="#f7f7f5" /><span id="textValue">#F7F7F5</span></div></label></div>
+      <div class="property-group"><h3>Visibility</h3><label class="toggle-row"><span>Show on desktop</span><input type="checkbox" checked /></label><label class="toggle-row"><span>Show on mobile</span><input type="checkbox" checked /></label></div>
+      <button class="outline-btn" type="button">Duplicate section</button>
+    </aside>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"><span>✓</span><div><strong>Site published</strong><small>Your latest changes are live.</small></div></div>
+  <script src="app.js"></script>
+</body>
+</html>

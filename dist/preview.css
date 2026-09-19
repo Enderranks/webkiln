@@ -1,0 +1,3 @@
+.preview-hidden { display: none !important; }
+.editor-shell.preview-mode { grid-template-columns: 1fr; }
+.editor-shell.preview-mode .canvas-wrap { padding-left: 8vw; padding-right: 8vw; }
