@@ -1,35 +1,30 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "webkiln-v10-api-dev",
-	"main": "worker/src/index.ts",
-	"compatibility_date": "2026-09-19",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS",
-		"not_found_handling": "single-page-application",
-		"run_worker_first": [
-			"/api/*"
-		]
-	},
-	"vars": {
-		"APP_ORIGIN": "http://localhost:4173",
-		"AUTH_URL": "http://localhost:8787",
-		"ENVIRONMENT": "development",
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "webkiln-v10-dev",
-			"migrations_dir": "worker/migrations",
-		},
-		{
-			"binding": "webkiln_v10_dev",
-			"database_name": "webkiln-v10-dev",
-			"database_id": "1868187f-3e50-40e4-9ab7-bb434c6c9605",
-			"remote": true
-		},
-	],
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "webkiln-v10-api-dev",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "vars": {
+    "APP_ORIGIN": "https://webkiln-v10-api-dev.underline-dev.workers.dev",
+    "AUTH_URL": "https://webkiln-v10-api-dev.underline-dev.workers.dev",
+    "ENVIRONMENT": "development"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "webkiln-v10-dev",
+      "database_id": "1868187f-3e50-40e4-9ab7-bb434c6c9605",
+      "migrations_dir": "worker/migrations"
+    }
+  ]
 }
