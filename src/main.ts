@@ -11,6 +11,7 @@ import { renderDashboard } from './cloud/dashboard-view';
 import type { Session, SiteProject, SiteRevision } from './cloud/contracts';
 import { protectedRedirect } from './cloud/protected-route';
 import { EditingExperienceController } from './editor/editing-experience';
+import { DesignGuardianController } from './editor/design-guardian';
 
 const cloud = new WebKilnApiClient();
 const storage = new LocalProjectStorage();
@@ -79,6 +80,9 @@ async function bootEditor(siteId?: string, remote?: SiteProject): Promise<void> 
     editorController.start();
     new EditingExperienceController(adapter, project, () =>
       editorController.markDirty('Responsive settings'),
+    ).start();
+    new DesignGuardianController(adapter, project, () =>
+      editorController.markDirty('Design system'),
     ).start();
     renderAccountMenu(cloud);
     renderCloudStatus(cloud, siteId);

@@ -1,0 +1,129 @@
+.v14-health-card {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.v14-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.v14-health-card h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.token-list {
+  display: grid;
+  gap: 7px;
+  max-height: 290px;
+  overflow: auto;
+}
+.token-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #12171a;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px;
+}
+.token-row strong,
+.token-row small {
+  display: block;
+}
+.token-row strong {
+  font-size: 10px;
+}
+.token-row small {
+  color: var(--muted);
+  font-size: 9px;
+  margin-top: 2px;
+}
+.token-row input {
+  width: 82px;
+  background: #0b0d0f;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: #fff;
+  padding: 5px;
+  font-size: 10px;
+}
+.v14-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.v14-actions button {
+  height: 32px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+.v14-health-card h4 {
+  font-size: 12px;
+  margin: 15px 0 8px;
+}
+.guardian-finding {
+  border-left: 3px solid var(--gold);
+  background: #15191c;
+  padding: 8px;
+  margin: 6px 0;
+  font-size: 10px;
+}
+.guardian-finding.error {
+  border-color: #f08080;
+}
+.guardian-finding.warning {
+  border-color: #e1bb73;
+}
+.guardian-finding p {
+  margin: 5px 0;
+  color: #c8cdcf;
+  line-height: 1.4;
+}
+.guardian-finding small {
+  color: var(--muted);
+}
+.guardian-finding button {
+  display: block;
+  margin-top: 7px;
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 4px;
+  padding: 5px;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+.guardian-finding em {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.health-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 0;
+}
+.health-row strong,
+.health-row small {
+  display: block;
+}
+.health-row strong {
+  font-size: 11px;
+}
+.health-row small {
+  font-size: 9px;
+  color: var(--muted);
+  max-width: 170px;
+}
+.health-row b {
+  font-size: 11px;
+  color: var(--gold);
+}
+.health-good {
+  color: #78d59b;
+  font-size: 11px;
+}

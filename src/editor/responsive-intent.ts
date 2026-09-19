@@ -6,6 +6,7 @@ import type {
   ResponsiveIntent,
   ResponsiveIntentKind,
 } from '../types';
+import { normalizeDesignSystem } from './design-system';
 
 export const INTENT_LABELS: Record<ResponsiveIntentKind, string> = {
   'keep-beside': 'Keep beside',
@@ -27,6 +28,7 @@ export function normalizeEditorSettings(value?: Partial<EditorSettings>): Editor
     mode: value?.mode === 'guided' || value?.mode === 'pro' ? value.mode : 'standard',
     breakpoints: value?.breakpoints?.length ? value.breakpoints : [...DEFAULT_BREAKPOINTS],
     responsiveIntents: value?.responsiveIntents ?? {},
+    designSystem: normalizeDesignSystem(value?.designSystem),
   };
 }
 

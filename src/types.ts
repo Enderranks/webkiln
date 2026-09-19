@@ -35,6 +35,20 @@ export interface EditorSettings {
   mode: EditingMode;
   breakpoints: ResponsiveBreakpoint[];
   responsiveIntents: Record<string, ResponsiveComponentMetadata>;
+  designSystem?: DesignSystem;
+}
+
+export interface DesignToken {
+  name: string;
+  value: string;
+  category: string;
+  description?: string;
+}
+export interface DesignSystem {
+  tokens: DesignToken[];
+  componentVariants: Record<string, Array<{ name: string; styles: Record<string, string> }>>;
+  linkedComponents: Record<string, string[]>;
+  globalRegions: { navigation?: string; footer?: string; announcement?: string };
 }
 
 export interface SiteMetadata {

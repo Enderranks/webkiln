@@ -1,4 +1,5 @@
 import type { EditorSettings, WebKilnProject } from '../types';
+import { defaultDesignSystem } from '../editor/design-system';
 
 export const CURRENT_SCHEMA_VERSION = 2 as const;
 export const DEFAULT_BREAKPOINTS = [
@@ -8,7 +9,12 @@ export const DEFAULT_BREAKPOINTS = [
   { id: 'mobile', label: 'Mobile', width: 390, inheritedFrom: 'tablet' },
 ] as const;
 export function createDefaultEditorSettings(): EditorSettings {
-  return { mode: 'standard', breakpoints: [...DEFAULT_BREAKPOINTS], responsiveIntents: {} };
+  return {
+    mode: 'standard',
+    breakpoints: [...DEFAULT_BREAKPOINTS],
+    responsiveIntents: {},
+    designSystem: defaultDesignSystem(),
+  };
 }
 
 function normalizePage(page: Partial<WebKilnProject['pages'][number]>, index: number) {
@@ -84,6 +90,10 @@ export function migrateProject(value: unknown): WebKilnProject {
           ? candidate.editorSettings.breakpoints
           : [...DEFAULT_BREAKPOINTS],
         responsiveIntents: candidate.editorSettings?.responsiveIntents ?? {},
+        designSystem: {
+          ...defaultDesignSystem(),
+          ...(candidate.editorSettings?.designSystem ?? {}),
+        },
       },
     };
   }
