@@ -374,6 +374,7 @@ app.get('/api/sites/:siteId/project', async (c) => {
     currentPageId: pages.find((item) => item.homepage)?.id ?? pages[0]?.id ?? 'home',
     homepagePageId: pages.find((item) => item.homepage)?.id ?? 'home',
     themeTokens: JSON.parse(record.site.themeData),
+    editorSettings: JSON.parse(record.site.editorSettings ?? '{}'),
     assets: [],
     customCode: { html: '', css: '', javascript: '', isolated: true as const },
     revisions: revisions.map((item) => ({
@@ -395,7 +396,11 @@ app.put('/api/sites/:siteId/project', async (c) => {
   const record = await getSiteAccess(c, 'editor');
   if ('error' in record) return record.response;
   const body = await c.req.json<{
-    project?: { pages?: Array<Record<string, unknown>>; themeTokens?: Record<string, string> };
+    project?: {
+      pages?: Array<Record<string, unknown>>;
+      themeTokens?: Record<string, string>;
+      editorSettings?: Record<string, unknown>;
+    };
     expectedRevision?: number;
   }>();
   if (!body.project || typeof body.expectedRevision !== 'number')
@@ -426,6 +431,7 @@ app.put('/api/sites/:siteId/project', async (c) => {
       updatedBy: record.user.id,
       updatedAt: now,
       themeData: JSON.stringify(body.project.themeTokens ?? {}),
+      editorSettings: JSON.stringify(body.project.editorSettings ?? {}),
     })
     .where(eq(site.id, record.site.id));
   await db.insert(auditEvent).values({

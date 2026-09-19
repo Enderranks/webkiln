@@ -1,186 +1,590 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0b0d0f" />
-  <meta name="description" content="WebKiln is a focused visual website builder for hosting businesses and their clients." />
-  <title>WebKiln — Website Editor</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d0f'/%3E%3Cpath d='M13 18l9 30 10-20 10 20 9-30' fill='none' stroke='%23d6ad61' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles/styles.css" />
-  <link rel="stylesheet" href="/styles/hybrid.css" />
-  <link rel="stylesheet" href="/styles/polish.css" />
-  <link rel="stylesheet" href="/styles/rebuild.css" />
-  <link rel="stylesheet" href="/styles/preview.css" />
-  <link rel="stylesheet" href="/styles/grapesjs.css" />
-  <link rel="stylesheet" href="/styles/cloud-app.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand" aria-label="WebKiln home">
-      <span class="brand-mark">W</span>
-      <span>WEBKILN</span>
-    </div>
-    <button class="project-switcher" type="button"><span class="site-dot"></span> Underline Hosting <span>⌄</span></button>
-    <div class="history-controls" aria-label="Edit history">
-      <button id="undoBtn" class="icon-btn" type="button" title="Undo" aria-label="Undo">↶</button>
-      <button id="redoBtn" class="icon-btn" type="button" title="Redo" aria-label="Redo">↷</button>
-    </div>
-    <div class="device-controls" aria-label="Preview size">
-      <button class="device active" data-width="desktop" type="button" aria-label="Desktop preview">▰</button>
-      <button class="device" data-width="tablet" type="button" aria-label="Tablet preview">▯</button>
-      <button class="device" data-width="mobile" type="button" aria-label="Mobile preview">▯</button>
-    </div>
-    <div class="top-actions">
-      <span id="saveState" class="save-state"><i></i> Saved</span>
-      <span class="health-pill"><i></i> Healthy</span>
-      <button id="helpBtn" class="icon-btn help-button" type="button" aria-label="Open help">?</button>
-      <button id="setupBtn" class="ghost-btn" type="button">Site setup</button>
-      <button id="previewBtn" class="ghost-btn" type="button">Preview</button>
-      <button id="publishBtn" class="primary-btn" type="button">Publish site</button>
-    </div>
-  </header>
-
-  <main class="editor-shell">
-    <aside class="left-rail">
-      <nav class="rail-tabs" aria-label="Editor tools">
-        <button class="rail-tab active" data-panel="blocks" type="button"><span>＋</span>Add</button>
-        <button class="rail-tab" data-panel="pages" type="button"><span>▤</span>Pages</button>
-        <button class="rail-tab" data-panel="layers" type="button"><span>≡</span>Layers</button>
-        <button class="rail-tab" data-panel="components" type="button"><span>◆</span>Components</button>
-        <button class="rail-tab" data-panel="assets" type="button"><span>▧</span>Assets</button>
-        <button class="rail-tab" data-panel="theme" type="button"><span>◐</span>Theme</button>
-        <button class="rail-tab" data-panel="site" type="button"><span>⚙</span>Site</button>
-      </nav>
-
-      <section class="panel active" id="blocksPanel">
-        <div class="panel-heading">
-          <div><p class="eyebrow">Build faster</p><h1>Site kit</h1></div>
-          <button class="mini-btn" type="button" title="Close panel">×</button>
-        </div>
-        <label class="search"><span>⌕</span><input id="blockSearch" type="search" placeholder="Search blocks" /></label>
-        <div class="category-row">
-          <button class="chip active" data-filter="all" type="button">All</button>
-          <button class="chip" data-filter="layout" type="button">Layout</button>
-          <button class="chip" data-filter="commerce" type="button">Commerce</button>
-        </div>
-        <div class="starter-card"><span class="starter-icon">✦</span><div><strong>Start with AI</strong><small>Describe a page and WebKiln will draft the sections.</small></div><button type="button" id="aiStarterBtn">Try it</button></div>
-        <p class="subheading">Drag & drop sections</p>
-        <div id="blockList" class="block-list">
-          <button class="block-card" draggable="true" data-type="hero" data-category="layout" type="button"><span class="block-preview hero-preview"><i></i><b></b></span><strong>Hero</strong><small>Headline, copy and action</small></button>
-          <button class="block-card" draggable="true" data-type="features" data-category="layout" type="button"><span class="block-preview cards-preview"><i></i><i></i><i></i></span><strong>Feature grid</strong><small>Three benefit cards</small></button>
-          <button class="block-card" draggable="true" data-type="pricing" data-category="commerce" type="button"><span class="block-preview price-preview"><i></i><i></i><i></i></span><strong>Pricing plans</strong><small>Plans with checkout buttons</small></button>
-          <button class="block-card" draggable="true" data-type="games" data-category="commerce" type="button"><span class="block-preview games-preview"><i></i><i></i></span><strong>Game selector</strong><small>Searchable hosting catalog</small></button>
-          <button class="block-card" draggable="true" data-type="quote" data-category="commerce" type="button"><span class="block-preview quote-preview"><i></i><b></b></span><strong>Custom quote</strong><small>Live price estimate form</small></button>
-          <button class="block-card" draggable="true" data-type="media" data-category="layout" type="button"><span class="block-preview media-preview"><i></i><i></i><i></i></span><strong>Media gallery</strong><small>Images, logos and captions</small></button>
-          <button class="block-card" draggable="true" data-type="form" data-category="commerce" type="button"><span class="block-preview form-preview"><i></i><i></i><b></b></span><strong>Contact form</strong><small>Lead capture and enquiries</small></button>
-          <button class="block-card" draggable="true" data-type="footer" data-category="layout" type="button"><span class="block-preview footer-preview"><i></i><b></b></span><strong>Footer</strong><small>Links and legal details</small></button>
-        </div>
-      </section>
-
-      <section class="panel" id="pagesPanel">
-        <div class="panel-heading"><div><p class="eyebrow">Structure</p><h1>Pages</h1></div><button class="mini-btn" type="button">＋</button></div>
-        <div class="page-tools"><button class="tiny-active" type="button">Pages</button><button type="button">Site tree</button></div>
-        <button class="page-row active" type="button"><span>⌂</span><strong>Home</strong><small>•••</small></button>
-        <button class="page-row" type="button"><span>▧</span><strong>Game Hosting</strong><small>•••</small></button>
-        <button class="page-row" type="button"><span>▧</span><strong>Support</strong><small>•••</small></button>
-        <div id="siteTree" class="site-tree" hidden></div>
-        <p class="panel-note">Drag pages to reorder your navigation. Select a page to edit its SEO, header and layout.</p>
-      </section>
-
-      <section class="panel" id="themePanel">
-        <div class="panel-heading"><div><p class="eyebrow">Brand system</p><h1>Site theme</h1></div></div>
-        <div class="theme-preview"><span></span><div><strong>Underline Studio</strong><small>Dark · Editorial · Conversion-led</small></div></div>
-        <label class="field">Primary color<input id="themeColor" type="color" value="#d6ad61" /></label>
-        <label class="field">Corner style<select id="radiusSelect"><option value="4">Sharp</option><option value="10" selected>Soft</option><option value="20">Round</option></select></label>
-        <label class="field">Heading font<select><option>Space Grotesk</option><option>DM Sans</option></select></label>
-      </section>
-
-      <section class="panel" id="layersPanel">
-        <div class="panel-heading"><div><p class="eyebrow">Structure</p><h1>Layers</h1></div><button class="mini-btn" type="button" id="collapseLayers">⌃</button></div>
-        <p class="panel-note">Select, rename, hide, lock, or reorder sections without touching the canvas.</p>
-        <div id="layerList" class="layer-list"></div>
-      </section>
-
-      <section class="panel" id="componentsPanel">
-        <div class="panel-heading"><div><p class="eyebrow">Reusable</p><h1>Components</h1></div><button class="mini-btn" type="button">＋</button></div>
-        <label class="search"><span>⌕</span><input id="componentSearch" type="search" placeholder="Search components" /></label>
-        <div class="component-groups"><p class="subheading">Core elements</p><button class="component-row" data-component="heading" type="button"><span>H</span><div><strong>Heading</strong><small>Editable typography</small></div></button><button class="component-row" data-component="button" type="button"><span>↗</span><div><strong>Button</strong><small>Action and link</small></div></button><button class="component-row" data-component="container" type="button"><span>□</span><div><strong>Container</strong><small>Responsive wrapper</small></div></button><p class="subheading">Patterns</p><button class="component-row" data-component="navigation" type="button"><span>≡</span><div><strong>Navigation</strong><small>Header and menus</small></div></button><button class="component-row" data-component="form" type="button"><span>⌁</span><div><strong>Form</strong><small>Lead capture</small></div></button></div>
-      </section>
-
-      <section class="panel" id="assetsPanel">
-        <div class="panel-heading"><div><p class="eyebrow">Media library</p><h1>Assets</h1></div><button class="mini-btn" type="button" id="assetUploadButton">＋</button></div>
-        <label class="search"><span>⌕</span><input id="assetSearch" type="search" placeholder="Search assets" /></label>
-        <div class="asset-drop" id="assetDrop"><span>↑</span><strong>Drop files here</strong><small>PNG, JPG, SVG, PDF up to 10 MB</small><button type="button" id="chooseAsset">Choose files</button><input id="assetInput" type="file" multiple hidden /></div>
-        <div id="assetList" class="asset-list"></div>
-      </section>
-
-      <section class="panel" id="sitePanel">
-        <div class="panel-heading"><div><p class="eyebrow">Project</p><h1>Site settings</h1></div></div>
-        <div class="site-setting-card"><span class="site-setting-icon">◎</span><div><strong>Site identity</strong><small>Title, domain, language and favicon</small></div><button type="button" id="openSiteSetup">Edit</button></div>
-        <div class="site-setting-card"><span class="site-setting-icon">↺</span><div><strong>Revision history</strong><small id="revisionCount">1 local checkpoint</small></div><button type="button" id="checkpointBtn">Save</button></div>
-        <div class="site-setting-card"><span class="site-setting-icon">&lt;/&gt;</span><div><strong>Custom code</strong><small>Sandboxed HTML, CSS and JavaScript</small></div><button type="button" id="codeEditorBtn">Open</button></div>
-        <p class="panel-note">Publishing keeps editor-only controls out of your public site. Custom code is isolated in preview mode.</p>
-      </section>
-    </aside>
-
-    <section class="workspace">
-      <div class="workspace-bar">
-        <div class="crumb"><span>Home</span><b>/</b><strong id="selectionLabel">Page</strong></div>
-        <div class="canvas-status"><span></span> Live canvas <b>·</b> Autosave on</div>
-        <div class="zoom"><button id="zoomOut" type="button">−</button><span id="zoomValue">90%</span><button id="zoomIn" type="button">＋</button></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d0f" />
+    <meta
+      name="description"
+      content="WebKiln is a focused visual website builder for hosting businesses and their clients."
+    />
+    <title>WebKiln — Website Editor</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d0f'/%3E%3Cpath d='M13 18l9 30 10-20 10 20 9-30' fill='none' stroke='%23d6ad61' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles/styles.css" />
+    <link rel="stylesheet" href="/styles/hybrid.css" />
+    <link rel="stylesheet" href="/styles/polish.css" />
+    <link rel="stylesheet" href="/styles/rebuild.css" />
+    <link rel="stylesheet" href="/styles/preview.css" />
+    <link rel="stylesheet" href="/styles/grapesjs.css" />
+    <link rel="stylesheet" href="/styles/cloud-app.css" />
+    <link rel="stylesheet" href="/styles/v13-responsive.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand" aria-label="WebKiln home">
+        <span class="brand-mark">W</span>
+        <span>WEBKILN</span>
       </div>
-      <div class="canvas-wrap" id="canvasWrap">
-        <div class="site-canvas desktop" id="siteCanvas" aria-label="Website canvas">
-          <nav class="demo-nav section-block selected" data-name="Navigation" tabindex="0">
-            <a class="demo-brand" href="#" onclick="return false">UNDERLINE<span></span></a>
-            <div class="demo-links"><a href="#" onclick="return false">Home</a><a href="#" onclick="return false">Game Servers</a><a href="#" onclick="return false">Network</a><a href="#" onclick="return false">Support</a></div>
-            <button type="button">Get Started</button>
-            <div class="selection-tag">Navigation</div>
-          </nav>
-          <div class="canvas-toolbar" aria-label="Quick edit toolbar"><button type="button" data-tool="move">↕ Move</button><button type="button" data-tool="edit">✎ Edit</button><button type="button" data-tool="style">◐ Style</button><button type="button" data-tool="duplicate">＋ Duplicate</button></div>
-          <section class="demo-hero section-block" data-name="Hero" tabindex="0">
-            <div class="hero-content"><span class="overline">HIGH-PERFORMANCE GAME HOSTING</span><h2 contenteditable="true">Power your<br />next world.</h2><p contenteditable="true">Fast, reliable servers for creators and communities. Deploy in under a minute.</p><div class="hero-actions"><button type="button">Choose your game</button><button class="secondary" type="button">View control panel</button></div><div class="trust-row"><span><b>99.99%</b> uptime</span><span><b>24/7</b> support</span><span><b>Instant</b> setup</span></div></div>
-            <div class="server-visual"><div class="rack"><i></i><i></i><i></i><i></i><i></i><span>UNDERLINE</span></div><div class="status-card"><em></em><strong>All systems operational</strong><small>Global network</small></div></div>
-          </section>
-          <div class="drop-zone" id="dropZone">Drop a section here</div>
-          <section class="demo-plans section-block" data-name="Pricing plans" tabindex="0">
-            <div class="section-intro"><span class="overline">SIMPLE PRICING</span><h3 contenteditable="true">Built for every kind of world.</h3><p>Start small and scale whenever your community grows.</p></div>
-            <div class="plan-grid">
-              <article><small>STARTER</small><h4>$4.99<span>/mo</span></h4><p>2 GB RAM · 10 GB NVMe</p><button type="button">Choose Starter</button></article>
-              <article class="featured"><div class="popular">MOST POPULAR</div><small>COMMUNITY</small><h4>$9.99<span>/mo</span></h4><p>4 GB RAM · 25 GB NVMe</p><button type="button">Choose Community</button></article>
-              <article><small>PRO</small><h4>$19.99<span>/mo</span></h4><p>8 GB RAM · 50 GB NVMe</p><button type="button">Choose Pro</button></article>
+      <button class="project-switcher" type="button">
+        <span class="site-dot"></span> Underline Hosting <span>⌄</span>
+      </button>
+      <div class="history-controls" aria-label="Edit history">
+        <button id="undoBtn" class="icon-btn" type="button" title="Undo" aria-label="Undo">
+          ↶
+        </button>
+        <button id="redoBtn" class="icon-btn" type="button" title="Redo" aria-label="Redo">
+          ↷
+        </button>
+      </div>
+      <div class="device-controls" aria-label="Preview size">
+        <button
+          class="device active"
+          data-width="desktop"
+          type="button"
+          aria-label="Desktop preview"
+        >
+          ▰
+        </button>
+        <button class="device" data-width="laptop" type="button" aria-label="Laptop preview">
+          ▰
+        </button>
+        <button class="device" data-width="tablet" type="button" aria-label="Tablet preview">
+          ▯
+        </button>
+        <button class="device" data-width="mobile" type="button" aria-label="Mobile preview">
+          ▯
+        </button>
+      </div>
+      <div class="top-actions">
+        <span id="saveState" class="save-state"><i></i> Saved</span>
+        <span class="health-pill"><i></i> Healthy</span>
+        <button id="helpBtn" class="icon-btn help-button" type="button" aria-label="Open help">
+          ?
+        </button>
+        <button id="setupBtn" class="ghost-btn" type="button">Site setup</button>
+        <button id="previewBtn" class="ghost-btn" type="button">Preview</button>
+        <button id="publishBtn" class="primary-btn" type="button">Publish site</button>
+      </div>
+    </header>
+
+    <main class="editor-shell">
+      <aside class="left-rail">
+        <nav class="rail-tabs" aria-label="Editor tools">
+          <button class="rail-tab active" data-panel="blocks" type="button">
+            <span>＋</span>Add
+          </button>
+          <button class="rail-tab" data-panel="pages" type="button"><span>▤</span>Pages</button>
+          <button class="rail-tab" data-panel="layers" type="button"><span>≡</span>Layers</button>
+          <button class="rail-tab" data-panel="components" type="button">
+            <span>◆</span>Components
+          </button>
+          <button class="rail-tab" data-panel="assets" type="button"><span>▧</span>Assets</button>
+          <button class="rail-tab" data-panel="theme" type="button"><span>◐</span>Theme</button>
+          <button class="rail-tab" data-panel="site" type="button"><span>⚙</span>Site</button>
+        </nav>
+
+        <section class="panel active" id="blocksPanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Build faster</p>
+              <h1>Site kit</h1>
             </div>
-          </section>
-        </div>
-      </div>
-      <div class="editor-statusbar"><span id="canvasSizeStatus">Canvas 1100 px</span><span id="selectionStatus">Navigation selected</span><span class="status-shortcuts">⌘/Ctrl S save · ⌘/Ctrl Z undo · Delete remove</span></div>
-    </section>
+            <button class="mini-btn" type="button" title="Close panel">×</button>
+          </div>
+          <label class="search"
+            ><span>⌕</span><input id="blockSearch" type="search" placeholder="Search blocks"
+          /></label>
+          <div class="category-row">
+            <button class="chip active" data-filter="all" type="button">All</button>
+            <button class="chip" data-filter="layout" type="button">Layout</button>
+            <button class="chip" data-filter="commerce" type="button">Commerce</button>
+          </div>
+          <div class="starter-card">
+            <span class="starter-icon">✦</span>
+            <div>
+              <strong>Start with AI</strong
+              ><small>Describe a page and WebKiln will draft the sections.</small>
+            </div>
+            <button type="button" id="aiStarterBtn">Try it</button>
+          </div>
+          <p class="subheading">Drag & drop sections</p>
+          <div id="blockList" class="block-list">
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="hero"
+              data-category="layout"
+              type="button"
+            >
+              <span class="block-preview hero-preview"><i></i><b></b></span><strong>Hero</strong
+              ><small>Headline, copy and action</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="features"
+              data-category="layout"
+              type="button"
+            >
+              <span class="block-preview cards-preview"><i></i><i></i><i></i></span
+              ><strong>Feature grid</strong><small>Three benefit cards</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="pricing"
+              data-category="commerce"
+              type="button"
+            >
+              <span class="block-preview price-preview"><i></i><i></i><i></i></span
+              ><strong>Pricing plans</strong><small>Plans with checkout buttons</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="games"
+              data-category="commerce"
+              type="button"
+            >
+              <span class="block-preview games-preview"><i></i><i></i></span
+              ><strong>Game selector</strong><small>Searchable hosting catalog</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="quote"
+              data-category="commerce"
+              type="button"
+            >
+              <span class="block-preview quote-preview"><i></i><b></b></span
+              ><strong>Custom quote</strong><small>Live price estimate form</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="media"
+              data-category="layout"
+              type="button"
+            >
+              <span class="block-preview media-preview"><i></i><i></i><i></i></span
+              ><strong>Media gallery</strong><small>Images, logos and captions</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="form"
+              data-category="commerce"
+              type="button"
+            >
+              <span class="block-preview form-preview"><i></i><i></i><b></b></span
+              ><strong>Contact form</strong><small>Lead capture and enquiries</small>
+            </button>
+            <button
+              class="block-card"
+              draggable="true"
+              data-type="footer"
+              data-category="layout"
+              type="button"
+            >
+              <span class="block-preview footer-preview"><i></i><b></b></span><strong>Footer</strong
+              ><small>Links and legal details</small>
+            </button>
+          </div>
+        </section>
 
-    <aside class="inspector">
-      <div class="inspector-head"><div><p class="eyebrow">Element inspector</p><h2 id="inspectorTitle">Navigation</h2></div><button id="deleteBtn" class="mini-btn danger" type="button" title="Delete section">⌫</button></div>
-      <div class="inspector-tabs"><button class="active" type="button">Content</button><button type="button">Style</button><button type="button">Advanced</button></div>
-      <div class="element-path"><span>Body</span><b>›</b><span>Home</span><b>›</b><strong id="elementPath">Navigation</strong></div>
-      <div class="property-group"><h3>Layout</h3><div class="segmented"><button class="active" type="button">Full</button><button type="button">Boxed</button></div><label class="field">Section spacing<input id="spacingRange" type="range" min="20" max="120" value="60" /><span id="spacingValue">60 px</span></label></div>
-      <div class="property-group"><h3>Appearance</h3><label class="field">Background<div class="color-input"><input id="bgColor" type="color" value="#0b0d0f" /><span id="bgValue">#0B0D0F</span></div></label><label class="field">Text color<div class="color-input"><input id="textColor" type="color" value="#f7f7f5" /><span id="textValue">#F7F7F5</span></div></label></div>
-      <div class="property-group"><h3>Visibility</h3><label class="toggle-row"><span>Show on desktop</span><input type="checkbox" checked /></label><label class="toggle-row"><span>Show on mobile</span><input type="checkbox" checked /></label></div>
-      <button class="outline-btn" type="button">Duplicate section</button>
-    </aside>
-  </main>
-  <div id="setupModal" class="modal-backdrop" hidden>
-    <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
-      <div class="modal-head"><div><p class="eyebrow">Site setup</p><h2 id="setupTitle">Make this site yours</h2></div><button id="closeSetup" class="mini-btn" type="button" aria-label="Close setup">×</button></div>
-      <p class="modal-copy">Configure the basics once, then keep designing in the visual editor.</p>
-      <div class="setup-grid"><label class="field">Site name<input id="siteName" value="Underline Hosting" /></label><label class="field">Business type<select id="businessType"><option>Hosting & infrastructure</option><option>Agency</option><option>Store</option><option>Portfolio</option><option>Local business</option></select></label><label class="field">Domain<input id="domainName" value="underlinehosting.com" /></label><label class="field">Search description<input id="siteDescription" value="Fast, reliable servers for creators and communities." /></label></div>
-      <div class="setup-checks"><label><input type="checkbox" checked /> Enable SEO basics</label><label><input type="checkbox" checked /> Add analytics placeholder</label><label><input type="checkbox" /> Connect a custom domain later</label></div>
-      <div class="modal-actions"><button id="cancelSetup" class="ghost-btn" type="button">Cancel</button><button id="saveSetup" class="primary-btn" type="button">Save site settings</button></div>
-    </section>
-  </div>
-  <div id="codeModal" class="modal-backdrop" hidden><section class="code-modal" role="dialog" aria-modal="true" aria-labelledby="codeTitle"><div class="modal-head"><div><p class="eyebrow">Advanced</p><h2 id="codeTitle">Custom code sandbox</h2></div><button id="closeCode" class="mini-btn" type="button" aria-label="Close code editor">×</button></div><p class="modal-copy">Code runs in an isolated preview sandbox and is never executed in the WebKiln editor shell.</p><div class="code-tabs"><button class="active" type="button">HTML</button><button type="button">CSS</button><button type="button">JS</button></div><textarea id="codeInput" spellcheck="false" aria-label="Custom code">&lt;section&gt;Your custom code goes here.&lt;/section&gt;</textarea><div class="modal-actions"><button id="cancelCode" class="ghost-btn" type="button">Cancel</button><button id="saveCode" class="primary-btn" type="button">Save sandbox code</button></div></section></div>
-  <div id="toast" class="toast" role="status" aria-live="polite"><span>✓</span><div><strong>Site published</strong><small>Your latest changes are live.</small></div></div>
-  <script type="module" src="/main.ts"></script>
-</body>
+        <section class="panel" id="pagesPanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Structure</p>
+              <h1>Pages</h1>
+            </div>
+            <button class="mini-btn" type="button">＋</button>
+          </div>
+          <div class="page-tools">
+            <button class="tiny-active" type="button">Pages</button
+            ><button type="button">Site tree</button>
+          </div>
+          <button class="page-row active" type="button">
+            <span>⌂</span><strong>Home</strong><small>•••</small>
+          </button>
+          <button class="page-row" type="button">
+            <span>▧</span><strong>Game Hosting</strong><small>•••</small>
+          </button>
+          <button class="page-row" type="button">
+            <span>▧</span><strong>Support</strong><small>•••</small>
+          </button>
+          <div id="siteTree" class="site-tree" hidden></div>
+          <p class="panel-note">
+            Drag pages to reorder your navigation. Select a page to edit its SEO, header and layout.
+          </p>
+        </section>
+
+        <section class="panel" id="themePanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Brand system</p>
+              <h1>Site theme</h1>
+            </div>
+          </div>
+          <div class="theme-preview">
+            <span></span>
+            <div>
+              <strong>Underline Studio</strong><small>Dark · Editorial · Conversion-led</small>
+            </div>
+          </div>
+          <label class="field"
+            >Primary color<input id="themeColor" type="color" value="#d6ad61"
+          /></label>
+          <label class="field"
+            >Corner style<select id="radiusSelect">
+              <option value="4">Sharp</option>
+              <option value="10" selected>Soft</option>
+              <option value="20">Round</option>
+            </select></label
+          >
+          <label class="field"
+            >Heading font<select>
+              <option>Space Grotesk</option>
+              <option>DM Sans</option>
+            </select></label
+          >
+        </section>
+
+        <section class="panel" id="layersPanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Structure</p>
+              <h1>Layers</h1>
+            </div>
+            <button class="mini-btn" type="button" id="collapseLayers">⌃</button>
+          </div>
+          <p class="panel-note">
+            Select, rename, hide, lock, or reorder sections without touching the canvas.
+          </p>
+          <div id="layerList" class="layer-list"></div>
+        </section>
+
+        <section class="panel" id="componentsPanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Reusable</p>
+              <h1>Components</h1>
+            </div>
+            <button class="mini-btn" type="button">＋</button>
+          </div>
+          <label class="search"
+            ><span>⌕</span
+            ><input id="componentSearch" type="search" placeholder="Search components"
+          /></label>
+          <div class="component-groups">
+            <p class="subheading">Core elements</p>
+            <button class="component-row" data-component="heading" type="button">
+              <span>H</span>
+              <div><strong>Heading</strong><small>Editable typography</small></div></button
+            ><button class="component-row" data-component="button" type="button">
+              <span>↗</span>
+              <div><strong>Button</strong><small>Action and link</small></div></button
+            ><button class="component-row" data-component="container" type="button">
+              <span>□</span>
+              <div><strong>Container</strong><small>Responsive wrapper</small></div>
+            </button>
+            <p class="subheading">Patterns</p>
+            <button class="component-row" data-component="navigation" type="button">
+              <span>≡</span>
+              <div><strong>Navigation</strong><small>Header and menus</small></div></button
+            ><button class="component-row" data-component="form" type="button">
+              <span>⌁</span>
+              <div><strong>Form</strong><small>Lead capture</small></div>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel" id="assetsPanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Media library</p>
+              <h1>Assets</h1>
+            </div>
+            <button class="mini-btn" type="button" id="assetUploadButton">＋</button>
+          </div>
+          <label class="search"
+            ><span>⌕</span><input id="assetSearch" type="search" placeholder="Search assets"
+          /></label>
+          <div class="asset-drop" id="assetDrop">
+            <span>↑</span><strong>Drop files here</strong
+            ><small>PNG, JPG, SVG, PDF up to 10 MB</small
+            ><button type="button" id="chooseAsset">Choose files</button
+            ><input id="assetInput" type="file" multiple hidden />
+          </div>
+          <div id="assetList" class="asset-list"></div>
+        </section>
+
+        <section class="panel" id="sitePanel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Project</p>
+              <h1>Site settings</h1>
+            </div>
+          </div>
+          <div class="site-setting-card">
+            <span class="site-setting-icon">◎</span>
+            <div>
+              <strong>Site identity</strong><small>Title, domain, language and favicon</small>
+            </div>
+            <button type="button" id="openSiteSetup">Edit</button>
+          </div>
+          <div class="site-setting-card">
+            <span class="site-setting-icon">↺</span>
+            <div>
+              <strong>Revision history</strong><small id="revisionCount">1 local checkpoint</small>
+            </div>
+            <button type="button" id="checkpointBtn">Save</button>
+          </div>
+          <div class="site-setting-card">
+            <span class="site-setting-icon">&lt;/&gt;</span>
+            <div><strong>Custom code</strong><small>Sandboxed HTML, CSS and JavaScript</small></div>
+            <button type="button" id="codeEditorBtn">Open</button>
+          </div>
+          <p class="panel-note">
+            Publishing keeps editor-only controls out of your public site. Custom code is isolated
+            in preview mode.
+          </p>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div class="workspace-bar">
+          <div class="crumb">
+            <span>Home</span><b>/</b><strong id="selectionLabel">Page</strong>
+          </div>
+          <div class="canvas-status"><span></span> Live canvas <b>·</b> Autosave on</div>
+          <div class="zoom">
+            <button id="zoomOut" type="button">−</button><span id="zoomValue">90%</span
+            ><button id="zoomIn" type="button">＋</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="site-canvas desktop" id="siteCanvas" aria-label="Website canvas">
+            <nav class="demo-nav section-block selected" data-name="Navigation" tabindex="0">
+              <a class="demo-brand" href="#" onclick="return false;">UNDERLINE<span></span></a>
+              <div class="demo-links">
+                <a href="#" onclick="return false;">Home</a
+                ><a href="#" onclick="return false;">Game Servers</a
+                ><a href="#" onclick="return false;">Network</a
+                ><a href="#" onclick="return false;">Support</a>
+              </div>
+              <button type="button">Get Started</button>
+              <div class="selection-tag">Navigation</div>
+            </nav>
+            <div class="canvas-toolbar" aria-label="Quick edit toolbar">
+              <button type="button" data-tool="move">↕ Move</button
+              ><button type="button" data-tool="edit">✎ Edit</button
+              ><button type="button" data-tool="style">◐ Style</button
+              ><button type="button" data-tool="duplicate">＋ Duplicate</button>
+            </div>
+            <section class="demo-hero section-block" data-name="Hero" tabindex="0">
+              <div class="hero-content">
+                <span class="overline">HIGH-PERFORMANCE GAME HOSTING</span>
+                <h2 contenteditable="true">Power your<br />next world.</h2>
+                <p contenteditable="true">
+                  Fast, reliable servers for creators and communities. Deploy in under a minute.
+                </p>
+                <div class="hero-actions">
+                  <button type="button">Choose your game</button
+                  ><button class="secondary" type="button">View control panel</button>
+                </div>
+                <div class="trust-row">
+                  <span><b>99.99%</b> uptime</span><span><b>24/7</b> support</span
+                  ><span><b>Instant</b> setup</span>
+                </div>
+              </div>
+              <div class="server-visual">
+                <div class="rack"><i></i><i></i><i></i><i></i><i></i><span>UNDERLINE</span></div>
+                <div class="status-card">
+                  <em></em><strong>All systems operational</strong><small>Global network</small>
+                </div>
+              </div>
+            </section>
+            <div class="drop-zone" id="dropZone">Drop a section here</div>
+            <section class="demo-plans section-block" data-name="Pricing plans" tabindex="0">
+              <div class="section-intro">
+                <span class="overline">SIMPLE PRICING</span>
+                <h3 contenteditable="true">Built for every kind of world.</h3>
+                <p>Start small and scale whenever your community grows.</p>
+              </div>
+              <div class="plan-grid">
+                <article>
+                  <small>STARTER</small>
+                  <h4>$4.99<span>/mo</span></h4>
+                  <p>2 GB RAM · 10 GB NVMe</p>
+                  <button type="button">Choose Starter</button>
+                </article>
+                <article class="featured">
+                  <div class="popular">MOST POPULAR</div>
+                  <small>COMMUNITY</small>
+                  <h4>$9.99<span>/mo</span></h4>
+                  <p>4 GB RAM · 25 GB NVMe</p>
+                  <button type="button">Choose Community</button>
+                </article>
+                <article>
+                  <small>PRO</small>
+                  <h4>$19.99<span>/mo</span></h4>
+                  <p>8 GB RAM · 50 GB NVMe</p>
+                  <button type="button">Choose Pro</button>
+                </article>
+              </div>
+            </section>
+          </div>
+        </div>
+        <div class="editor-statusbar">
+          <span id="canvasSizeStatus">Canvas 1100 px</span
+          ><span id="selectionStatus">Navigation selected</span
+          ><span class="status-shortcuts">⌘/Ctrl S save · ⌘/Ctrl Z undo · Delete remove</span>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <div class="inspector-head">
+          <div>
+            <p class="eyebrow">Element inspector</p>
+            <h2 id="inspectorTitle">Navigation</h2>
+          </div>
+          <button id="deleteBtn" class="mini-btn danger" type="button" title="Delete section">
+            ⌫
+          </button>
+        </div>
+        <div class="inspector-tabs">
+          <button class="active" type="button">Content</button><button type="button">Style</button
+          ><button type="button">Advanced</button>
+        </div>
+        <p id="modeDescription" class="mode-description" aria-live="polite"></p>
+        <div class="element-path">
+          <span>Body</span><b>›</b><span>Home</span><b>›</b
+          ><strong id="elementPath">Navigation</strong>
+        </div>
+        <div class="property-group">
+          <h3>Layout</h3>
+          <div class="segmented">
+            <button class="active" type="button">Full</button><button type="button">Boxed</button>
+          </div>
+          <label class="field"
+            >Section spacing<input
+              id="spacingRange"
+              type="range"
+              min="20"
+              max="120"
+              value="60"
+            /><span id="spacingValue">60 px</span></label
+          >
+        </div>
+        <div class="property-group">
+          <h3>Appearance</h3>
+          <label class="field"
+            >Background
+            <div class="color-input">
+              <input id="bgColor" type="color" value="#0b0d0f" /><span id="bgValue">#0B0D0F</span>
+            </div></label
+          ><label class="field"
+            >Text color
+            <div class="color-input">
+              <input id="textColor" type="color" value="#f7f7f5" /><span id="textValue"
+                >#F7F7F5</span
+              >
+            </div></label
+          >
+        </div>
+        <div class="property-group">
+          <h3>Visibility</h3>
+          <label class="toggle-row"
+            ><span>Show on desktop</span><input type="checkbox" checked /></label
+          ><label class="toggle-row"
+            ><span>Show on mobile</span><input type="checkbox" checked
+          /></label>
+        </div>
+        <button class="outline-btn" type="button">Duplicate section</button>
+      </aside>
+    </main>
+    <div id="setupModal" class="modal-backdrop" hidden>
+      <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Site setup</p>
+            <h2 id="setupTitle">Make this site yours</h2>
+          </div>
+          <button id="closeSetup" class="mini-btn" type="button" aria-label="Close setup">×</button>
+        </div>
+        <p class="modal-copy">
+          Configure the basics once, then keep designing in the visual editor.
+        </p>
+        <div class="setup-grid">
+          <label class="field">Site name<input id="siteName" value="Underline Hosting" /></label
+          ><label class="field"
+            >Business type<select id="businessType">
+              <option>Hosting & infrastructure</option>
+              <option>Agency</option>
+              <option>Store</option>
+              <option>Portfolio</option>
+              <option>Local business</option>
+            </select></label
+          ><label class="field">Domain<input id="domainName" value="underlinehosting.com" /></label
+          ><label class="field"
+            >Search description<input
+              id="siteDescription"
+              value="Fast, reliable servers for creators and communities."
+          /></label>
+        </div>
+        <div class="setup-checks">
+          <label><input type="checkbox" checked /> Enable SEO basics</label
+          ><label><input type="checkbox" checked /> Add analytics placeholder</label
+          ><label><input type="checkbox" /> Connect a custom domain later</label>
+        </div>
+        <div class="modal-actions">
+          <button id="cancelSetup" class="ghost-btn" type="button">Cancel</button
+          ><button id="saveSetup" class="primary-btn" type="button">Save site settings</button>
+        </div>
+      </section>
+    </div>
+    <div id="codeModal" class="modal-backdrop" hidden>
+      <section class="code-modal" role="dialog" aria-modal="true" aria-labelledby="codeTitle">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">Advanced</p>
+            <h2 id="codeTitle">Custom code sandbox</h2>
+          </div>
+          <button id="closeCode" class="mini-btn" type="button" aria-label="Close code editor">
+            ×
+          </button>
+        </div>
+        <p class="modal-copy">
+          Code runs in an isolated preview sandbox and is never executed in the WebKiln editor
+          shell.
+        </p>
+        <div class="code-tabs">
+          <button class="active" type="button">HTML</button><button type="button">CSS</button
+          ><button type="button">JS</button>
+        </div>
+        <textarea id="codeInput" spellcheck="false" aria-label="Custom code">
+&lt;section&gt;Your custom code goes here.&lt;/section&gt;</textarea>
+        <div class="modal-actions">
+          <button id="cancelCode" class="ghost-btn" type="button">Cancel</button
+          ><button id="saveCode" class="primary-btn" type="button">Save sandbox code</button>
+        </div>
+      </section>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite">
+      <span>✓</span>
+      <div><strong>Site published</strong><small>Your latest changes are live.</small></div>
+    </div>
+    <script type="module" src="/main.ts"></script>
+  </body>
 </html>

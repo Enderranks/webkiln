@@ -3,10 +3,16 @@ import type { DeviceId, EditorAdapter, EditorEventName } from '../types';
 
 const deviceMap: Record<DeviceId, string> = {
   desktop: 'Desktop',
+  laptop: 'Laptop',
   tablet: 'Tablet',
   mobile: 'Mobile',
 };
-const deviceWidths: Record<DeviceId, number> = { desktop: 1100, tablet: 760, mobile: 390 };
+const deviceWidths: Record<DeviceId, number> = {
+  desktop: 1200,
+  laptop: 1024,
+  tablet: 768,
+  mobile: 390,
+};
 
 export class GrapesJSEditorAdapter implements EditorAdapter {
   private editor: Editor | null = null;
@@ -29,7 +35,8 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
       selectorManager: { componentFirst: true },
       deviceManager: {
         devices: [
-          { id: 'Desktop', name: 'Desktop', width: '1100px' },
+          { id: 'Desktop', name: 'Desktop', width: '1200px' },
+          { id: 'Laptop', name: 'Laptop', width: '1024px' },
           { id: 'Tablet', name: 'Tablet', width: '768px' },
           { id: 'Mobile', name: 'Mobile', width: '390px' },
         ],
@@ -191,7 +198,7 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
     const editor = this.requireEditor();
     editor.setDevice(deviceMap[device]);
     this.getRoot()?.setClass(`site-canvas ${device}`);
-    this.sourceContainer.classList.remove('desktop', 'tablet', 'mobile');
+    this.sourceContainer.classList.remove('desktop', 'laptop', 'tablet', 'mobile');
     this.sourceContainer.classList.add(device);
     this.sourceContainer.style.width = `${deviceWidths[device]}px`;
     this.emit('device', device);
@@ -199,6 +206,17 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
 
   getSelectedComponent(): Component | null {
     return this.requireEditor().getSelected() ?? null;
+  }
+
+  getComponentId(component?: Component | null): string {
+    const target = component ?? this.getSelectedComponent();
+    if (!target) return '';
+    return String(target.getId?.() ?? target.cid ?? '');
+  }
+
+  addResponsiveStyles(css: string): void {
+    this.requireEditor().addStyle(css);
+    this.injectFrameStyles(css);
   }
 
   setZoom(value: number): void {

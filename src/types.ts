@@ -1,4 +1,41 @@
-export type DeviceId = 'desktop' | 'tablet' | 'mobile';
+export type DeviceId = 'desktop' | 'laptop' | 'tablet' | 'mobile';
+export type EditingMode = 'guided' | 'standard' | 'pro';
+export type ResponsiveIntentKind =
+  | 'keep-beside'
+  | 'stack-below'
+  | 'full-width-small'
+  | 'hide-at-breakpoint'
+  | 'reorder-mobile'
+  | 'maintain-aspect'
+  | 'prioritize-content'
+  | 'mobile-navigation'
+  | 'horizontal-scroll'
+  | 'accordion'
+  | 'responsive-type'
+  | 'preserve-custom';
+export interface ResponsiveBreakpoint {
+  id: string;
+  label: string;
+  width: number;
+  inheritedFrom?: string;
+}
+export interface ResponsiveIntent {
+  kind: ResponsiveIntentKind;
+  enabled: boolean;
+  breakpoint?: string;
+  order?: number;
+  value?: string;
+  source: EditingMode;
+}
+export interface ResponsiveComponentMetadata {
+  intents: ResponsiveIntent[];
+  overrides?: Record<string, boolean>;
+}
+export interface EditorSettings {
+  mode: EditingMode;
+  breakpoints: ResponsiveBreakpoint[];
+  responsiveIntents: Record<string, ResponsiveComponentMetadata>;
+}
 
 export interface SiteMetadata {
   id: string;
@@ -28,6 +65,7 @@ export interface WebKilnProject {
   homepagePageId: string;
   currentPageId: string;
   themeTokens: Record<string, string>;
+  editorSettings?: EditorSettings;
   assets: Array<{ id: string; name: string; mime: string; size: number }>;
   customCode: { html: string; css: string; javascript: string; isolated: true };
   revisions: Array<{

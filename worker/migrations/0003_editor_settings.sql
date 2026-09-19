@@ -1,0 +1,1 @@
+ALTER TABLE site ADD COLUMN editor_settings TEXT NOT NULL DEFAULT '{}';

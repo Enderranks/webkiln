@@ -1,0 +1,140 @@
+.editing-experience-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.mode-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mode-picker select {
+  background: #15191c;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: #fff;
+  padding: 7px;
+}
+.breakpoint-picker {
+  display: flex;
+  gap: 3px;
+  background: #14171a;
+  border: 1px solid var(--line);
+  padding: 3px;
+  border-radius: 8px;
+}
+.breakpoint-picker button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.breakpoint-picker button.active,
+.breakpoint-picker button:hover {
+  background: #2b3035;
+  color: #fff;
+}
+.mode-description,
+.field-help {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.guided-panel {
+  border: 1px solid #4d4129;
+  background: rgba(214, 173, 97, 0.06);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.guided-panel h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.guided-actions {
+  display: grid;
+  gap: 6px;
+}
+.guided-actions button,
+.content-checklist label {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: left;
+  font-size: 11px;
+  color: #e9e7df;
+  cursor: pointer;
+}
+.content-checklist {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+.content-checklist input,
+.intent-row input {
+  accent-color: var(--gold);
+}
+.responsive-panel {
+  background: #12171a;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.intent-list {
+  display: grid;
+  gap: 7px;
+  max-height: 250px;
+  overflow: auto;
+  margin: 10px 0;
+}
+.intent-row {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  color: #ccd1d2;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.responsive-warnings {
+  color: #e1bb73;
+  font-size: 10px;
+  line-height: 1.4;
+  margin-top: 9px;
+}
+.pro-mode .responsive-panel {
+  border-color: #6c5a35;
+}
+.guided-mode .inspector-tabs button:nth-child(n + 2),
+.guided-mode .property-group:nth-of-type(n + 2) {
+  opacity: 0.35;
+}
+.responsive-compare .canvas-wrap:after {
+  content: 'Compare mode · inherited / override';
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  background: #d6ad61;
+  color: #17130d;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.site-canvas.laptop {
+  width: 1024px;
+}
+.site-canvas.desktop {
+  width: 1200px;
+}
+@media (max-width: 1050px) {
+  .editing-experience-toolbar {
+    display: none;
+  }
+}

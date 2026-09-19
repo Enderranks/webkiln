@@ -1,6 +1,15 @@
-import type { WebKilnProject } from '../types';
+import type { EditorSettings, WebKilnProject } from '../types';
 
 export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const DEFAULT_BREAKPOINTS = [
+  { id: 'desktop', label: 'Desktop', width: 1200 },
+  { id: 'laptop', label: 'Laptop', width: 1024, inheritedFrom: 'desktop' },
+  { id: 'tablet', label: 'Tablet', width: 768, inheritedFrom: 'laptop' },
+  { id: 'mobile', label: 'Mobile', width: 390, inheritedFrom: 'tablet' },
+] as const;
+export function createDefaultEditorSettings(): EditorSettings {
+  return { mode: 'standard', breakpoints: [...DEFAULT_BREAKPOINTS], responsiveIntents: {} };
+}
 
 function normalizePage(page: Partial<WebKilnProject['pages'][number]>, index: number) {
   const id = page.id ?? (index === 0 ? 'home' : `page-${index + 1}`);
@@ -33,6 +42,7 @@ export function createEmptyProject(): WebKilnProject {
     currentPageId: 'home',
     homepagePageId: 'home',
     themeTokens: { primary: '#d6ad61', radius: '10px' },
+    editorSettings: createDefaultEditorSettings(),
     assets: [],
     customCode: { html: '', css: '', javascript: '', isolated: true },
     revisions: [
@@ -67,6 +77,14 @@ export function migrateProject(value: unknown): WebKilnProject {
       pages: candidate.pages.map(normalizePage),
       deletedPages: (candidate.deletedPages ?? []).map(normalizePage),
       homepagePageId: candidate.homepagePageId ?? candidate.pages[0]?.id ?? 'home',
+      editorSettings: {
+        ...createDefaultEditorSettings(),
+        ...(candidate.editorSettings ?? {}),
+        breakpoints: candidate.editorSettings?.breakpoints?.length
+          ? candidate.editorSettings.breakpoints
+          : [...DEFAULT_BREAKPOINTS],
+        responsiveIntents: candidate.editorSettings?.responsiveIntents ?? {},
+      },
     };
   }
   const project = createEmptyProject();

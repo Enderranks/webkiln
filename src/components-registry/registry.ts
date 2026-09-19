@@ -8,6 +8,8 @@ export interface ComponentDefinition {
   editableTraits: string[];
   allowedParents: string[];
   responsive: boolean;
+  guidedControls?: string[];
+  explanation?: string;
   migrate?: (value: unknown) => unknown;
 }
 
@@ -103,6 +105,8 @@ export const componentRegistry: ComponentDefinition[] = definitions.map(
     editableTraits: ['content', 'style', 'id', 'classes'],
     allowedParents: ['wrapper', 'body', 'section', 'container', 'columns'],
     responsive: true,
+    guidedControls: ['content', 'responsive'],
+    explanation: 'This component is safe to edit visually and adapts across breakpoints.',
     migrate: (value) => value,
   }),
 );

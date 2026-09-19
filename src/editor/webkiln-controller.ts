@@ -23,7 +23,12 @@ const blockMap: Record<string, string> = {
   footer: 'section',
 };
 
-const deviceWidths: Record<DeviceId, number> = { desktop: 1100, tablet: 760, mobile: 390 };
+const deviceWidths: Record<DeviceId, number> = {
+  desktop: 1200,
+  laptop: 1024,
+  tablet: 768,
+  mobile: 390,
+};
 
 function firstComponent(value: unknown): Component | null {
   if (!value) return null;
@@ -786,11 +791,15 @@ export class WebKilnEditorController {
     component.components().models.forEach((child) => this.stripDuplicateIds(child));
   }
 
-  private scheduleSave(): void {
+  markDirty(label = 'Autosave'): void {
+    this.scheduleSave(label);
+  }
+
+  private scheduleSave(label = 'Autosave'): void {
     const state = document.querySelector('#saveState');
     state?.replaceChildren(document.createTextNode('Saving… · GrapesJS'));
     window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => this.saveNow('Autosave'), 450);
+    this.saveTimer = window.setTimeout(() => this.saveNow(label), 450);
   }
 
   private saveNow(label: string): void {

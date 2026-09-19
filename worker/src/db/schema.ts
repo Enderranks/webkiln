@@ -51,6 +51,7 @@ export const site = sqliteTable(
     homepagePageId: text('homepage_page_id'),
     projectSchemaVersion: integer('project_schema_version').notNull().default(2),
     themeData: text('theme_data').notNull().default('{}'),
+    editorSettings: text('editor_settings').notNull().default('{}'),
     settingsData: text('settings_data').notNull().default('{}'),
     customCodeMetadata: text('custom_code_metadata').notNull().default('{}'),
     createdBy: text('created_by').notNull(),
