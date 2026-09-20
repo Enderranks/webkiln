@@ -34,6 +34,23 @@ test.describe('WebKiln platform quality', () => {
     ).toBe(true);
   });
 
+  test('website canvas supports vertical scrolling', async ({ page }) => {
+    await page.goto('/');
+    const canvasFrame = page.locator('iframe.gjs-frame');
+    await expect(canvasFrame).toBeVisible();
+    const scrollState = await canvasFrame.evaluate((frame) => {
+      const documentElement = frame.contentDocument?.documentElement;
+      const body = frame.contentDocument?.body;
+      return {
+        overflow: body ? getComputedStyle(body).overflow : '',
+        scrollHeight: Math.max(documentElement?.scrollHeight ?? 0, body?.scrollHeight ?? 0),
+        clientHeight: frame.clientHeight,
+      };
+    });
+    expect(scrollState.overflow).toBe('auto');
+    expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
+  });
+
   test('protected cloud routes reject unauthenticated access', async ({ request }) => {
     test.skip(!process.env.WEBKILN_E2E_BASE_URL, 'Requires a deployed Worker base URL');
     const response = await request.get('/api/workspaces/no-workspace/members');

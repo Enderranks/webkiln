@@ -46,8 +46,10 @@ export class WebKilnEditorAdapter implements EditorAdapter {
       panels: { defaults: [] },
       blockManager: { blocks: [] },
     });
+    this.setCanvasFrameAccessibility();
     this.editor.addStyle(styles);
     this.editor.on('load', () => {
+      this.setCanvasFrameAccessibility();
       this.editor?.Canvas.getBody()?.classList.add('webkiln-canvas-body');
       this.injectFrameStyles(styles);
       this.emit('load');
@@ -64,6 +66,14 @@ export class WebKilnEditorAdapter implements EditorAdapter {
     this.setDevice('desktop');
   }
 
+  private setCanvasFrameAccessibility(): void {
+    const frame = this.sourceContainer.querySelector<HTMLIFrameElement>('iframe.gjs-frame');
+    if (frame) {
+      frame.title = 'WebKiln website canvas preview';
+      frame.setAttribute('scrolling', 'yes');
+    }
+  }
+
   private injectFrameStyles(styles: string): void {
     const frameDocument = this.editor?.Canvas.getDocument();
     if (!frameDocument) return;
@@ -71,7 +81,7 @@ export class WebKilnEditorAdapter implements EditorAdapter {
       frameDocument.head.querySelector<HTMLStyleElement>('[data-webkiln-styles]') ??
       frameDocument.createElement('style');
     style.dataset.webkilnStyles = 'true';
-    style.textContent = `${styles}\nbody{margin:0;background:#0b0d0f!important;color:#f4f5f3!important}`;
+    style.textContent = `${styles}\nhtml,body{overflow:auto!important}body{margin:0;background:#0b0d0f!important;color:#f4f5f3!important}`;
     frameDocument.head.appendChild(style);
   }
 
