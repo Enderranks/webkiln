@@ -59,6 +59,7 @@ export class WebKilnEditorController {
   private expandedLayerIds = new Set<string>();
   private clipboard: Component | null = null;
   private draggedLayerId: string | null = null;
+  private draggedPageId: string | null = null;
   private readonly commands = [
     ['add-section', 'Add section', 'Insert a new hero section'],
     ['add-component', 'Add component', 'Open reusable components'],
@@ -332,6 +333,38 @@ export class WebKilnEditorController {
         this.renderPages();
         this.saveNow('Page restored');
       }
+    });
+    document.querySelector('#pagesPanel')?.addEventListener('dragstart', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('.page-row[data-page-id]');
+      if (!row) return;
+      this.draggedPageId = row.dataset.pageId ?? null;
+      row.classList.add('dragging');
+      (event as DragEvent).dataTransfer?.setData('text/plain', this.draggedPageId ?? '');
+    });
+    document.querySelector('#pagesPanel')?.addEventListener('dragover', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('.page-row[data-page-id]');
+      if (!row || !this.draggedPageId || row.dataset.pageId === this.draggedPageId) return;
+      event.preventDefault();
+      document
+        .querySelectorAll('.page-row.drop-target')
+        .forEach((item) => item.classList.remove('drop-target'));
+      row.classList.add('drop-target');
+    });
+    document.querySelector('#pagesPanel')?.addEventListener('drop', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>('.page-row[data-page-id]');
+      const targetId = row?.dataset.pageId;
+      if (!targetId || !this.draggedPageId || targetId === this.draggedPageId) return;
+      event.preventDefault();
+      this.movePageBefore(this.draggedPageId, targetId);
+      this.draggedPageId = null;
+      this.renderPages();
+      this.saveNow('Pages reordered');
+    });
+    document.querySelector('#pagesPanel')?.addEventListener('dragend', () => {
+      this.draggedPageId = null;
+      document
+        .querySelectorAll('.page-row.dragging, .page-row.drop-target')
+        .forEach((item) => item.classList.remove('dragging', 'drop-target'));
     });
   }
 
@@ -894,6 +927,8 @@ export class WebKilnEditorController {
     [...this.project.pages].reverse().forEach((page) => {
       const row = document.createElement('div');
       row.className = `page-row ${page.id === this.project.currentPageId ? 'active' : ''}`;
+      row.dataset.pageId = page.id;
+      row.draggable = true;
       row.innerHTML = `<button data-page-action="open" data-page-id="${escapePageText(page.id)}" class="page-open"><span>▧</span><strong>${escapePageText(page.name)}</strong><small>${page.isHomepage ? 'Home · ' : ''}${escapePageText(page.slug)}${page.settings?.showInNavigation === false ? ' · Hidden' : ''}${page.settings?.passwordProtected ? ' · Protected' : ''}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${escapePageText(page.id)}" aria-label="Set homepage">⌂</button><button data-page-action="rename" data-page-id="${escapePageText(page.id)}" aria-label="Rename page">Aa</button><button data-page-action="seo" data-page-id="${escapePageText(page.id)}" aria-label="Edit SEO">SEO</button><button data-page-action="navigation" data-page-id="${escapePageText(page.id)}" aria-label="Toggle navigation visibility">☰</button><button data-page-action="protect" data-page-id="${escapePageText(page.id)}" aria-label="Toggle page protection">🔒</button><button data-page-action="up" data-page-id="${escapePageText(page.id)}" aria-label="Move page up">↑</button><button data-page-action="down" data-page-id="${escapePageText(page.id)}" aria-label="Move page down">↓</button><button data-page-action="duplicate" data-page-id="${escapePageText(page.id)}" aria-label="Duplicate page">＋</button><button data-page-action="delete" data-page-id="${escapePageText(page.id)}" aria-label="Archive page">×</button></span>`;
       tree.before(row);
     });
@@ -928,6 +963,15 @@ export class WebKilnEditorController {
     ];
     this.renderPages();
     this.saveNow('Pages reordered');
+  }
+
+  private movePageBefore(pageId: string, targetId: string): void {
+    const from = this.project.pages.findIndex((page) => page.id === pageId);
+    const target = this.project.pages.findIndex((page) => page.id === targetId);
+    if (from < 0 || target < 0 || from === target) return;
+    const [page] = this.project.pages.splice(from, 1);
+    const insertion = this.project.pages.findIndex((item) => item.id === targetId);
+    this.project.pages.splice(Math.max(0, insertion), 0, page);
   }
 
   private handleShortcut(event: KeyboardEvent): void {
