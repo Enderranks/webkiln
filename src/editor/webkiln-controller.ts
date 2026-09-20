@@ -126,6 +126,7 @@ export class WebKilnEditorController {
     document.querySelector('#previewBtn')?.addEventListener('click', () => this.togglePreview());
     document.querySelector('#shareBtn')?.addEventListener('click', () => {
       const url = window.location.href;
+      this.toast('Share link ready', url);
       const copy = navigator.clipboard?.writeText(url);
       if (copy) {
         void copy
@@ -135,9 +136,7 @@ export class WebKilnEditorController {
               'The current WebKiln editor link is on your clipboard.',
             ),
           )
-          .catch(() => this.toast('Share link ready', url));
-      } else {
-        this.toast('Share link ready', url);
+          .catch(() => undefined);
       }
     });
     document
