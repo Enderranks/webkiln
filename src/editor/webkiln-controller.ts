@@ -83,6 +83,12 @@ export class WebKilnEditorController {
     ['publish', 'Publish', 'Save a publish checkpoint'],
     ['save-revision', 'Save revision', 'Create a named local checkpoint'],
     ['search-settings', 'Search settings', 'Open site settings'],
+    ['group-selection', 'Group selection', 'Wrap selected elements in a reusable container'],
+    [
+      'ungroup-selection',
+      'Ungroup selection',
+      'Remove a selection container without losing children',
+    ],
     ['ai-outline', 'Suggest site outline', 'Use WebKiln’s local fallback suggestions'],
     ['ai-seo', 'Suggest SEO description', 'Draft metadata without sending project data externally'],
     ['ai-accessibility', 'Suggest accessibility improvements', 'Review safe, deterministic checks'],
@@ -264,6 +270,8 @@ export class WebKilnEditorController {
     if (command === 'ai-outline') this.showAiSuggestion('site-outline');
     if (command === 'ai-seo') this.showAiSuggestion('seo-description');
     if (command === 'ai-accessibility') this.showAiSuggestion('accessibility');
+    if (command === 'group-selection') this.groupSelected();
+    if (command === 'ungroup-selection') this.ungroupSelected();
   }
 
   private showAiSuggestion(kind: 'site-outline' | 'seo-description' | 'accessibility'): void {
@@ -1021,7 +1029,14 @@ export class WebKilnEditorController {
     detach.textContent = 'Detach';
     detach.disabled = !this.isLayoutContainer(this.selected?.parent());
     detach.onclick = () => this.detachSelected();
-    actions.append(duplicate, wrap, detach, remove);
+    const group = document.createElement('button');
+    group.textContent = 'Group selection';
+    group.onclick = () => this.groupSelected();
+    const ungroup = document.createElement('button');
+    ungroup.textContent = 'Ungroup';
+    ungroup.disabled = !this.isLayoutContainer(this.selected);
+    ungroup.onclick = () => this.ungroupSelected();
+    actions.append(duplicate, group, ungroup, wrap, detach, remove);
     host.append(actions);
     const lock = document.createElement('button');
     lock.className = 'mini-btn';
@@ -1146,6 +1161,62 @@ export class WebKilnEditorController {
   private duplicateSelected(): void {
     const copy = firstComponent(this.adapter.duplicateComponent(this.selected ?? undefined));
     if (copy) this.adapter.selectComponent(copy);
+  }
+
+  private selectedComponents(): Component[] {
+    const editor = this.adapter.getEditor() as unknown as {
+      getSelectedAll?: () => Component[];
+    };
+    const selected = editor.getSelectedAll?.() ?? [];
+    return selected.length ? selected : this.selected ? [this.selected] : [];
+  }
+
+  private groupSelected(): void {
+    const selected = this.selectedComponents();
+    if (selected.length < 2) {
+      this.toast(
+        'Select two or more elements',
+        'Use Ctrl/Cmd-click to add elements to the selection.',
+      );
+      return;
+    }
+    const parent = selected[0].parent();
+    if (!parent || selected.some((component) => component.parent() !== parent)) {
+      this.toast('Group unavailable', 'Selected elements must share the same parent container.');
+      return;
+    }
+    const ordered = [...selected].sort(
+      (left, right) =>
+        parent.components().models.indexOf(left) - parent.components().models.indexOf(right),
+    );
+    const firstIndex = parent.components().models.indexOf(ordered[0]);
+    const wrapper = parent.append({
+      tagName: 'div',
+      attributes: { class: 'wk-layout-container wk-selection-group' },
+    })[0];
+    if (!wrapper) return;
+    wrapper.move(parent, { at: firstIndex });
+    ordered.forEach((component) => component.move(wrapper, { at: wrapper.components().length }));
+    this.adapter.selectComponent(wrapper);
+    this.renderLayers();
+    this.renderDynamicInspector('content');
+    this.scheduleSave('Elements grouped');
+    this.toast('Elements grouped', 'The selection is now a layout container.');
+  }
+
+  private ungroupSelected(): void {
+    const wrapper = this.selected;
+    const parent = wrapper?.parent();
+    if (!wrapper || !parent || !this.isLayoutContainer(wrapper)) return;
+    const index = parent.components().models.indexOf(wrapper);
+    const children = [...wrapper.components().models];
+    children.forEach((child, offset) => child.move(parent, { at: index + offset }));
+    wrapper.remove();
+    if (children[0]) this.adapter.selectComponent(children[0]);
+    this.renderLayers();
+    this.renderDynamicInspector('content');
+    this.scheduleSave('Elements ungrouped');
+    this.toast('Elements ungrouped', 'Children remain in their original order.');
   }
 
   private deleteSelected(): void {

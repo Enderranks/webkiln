@@ -68,6 +68,8 @@ test.describe('WebKiln platform quality', () => {
     await page.locator('#commandSearch').fill('publish');
     await expect(page.locator('[data-command="publish"]')).toBeVisible();
     await expect(page.locator('[data-command="add-section"]')).toHaveCount(0);
+    await page.locator('#commandSearch').fill('group selection');
+    await expect(page.locator('[data-command="group-selection"]')).toBeVisible();
   });
 
   test('component catalog exposes registry-backed sections', async ({ page, isMobile }) => {
