@@ -1,0 +1,2 @@
+ALTER TABLE page ADD COLUMN parent_id TEXT;
+ALTER TABLE page ADD COLUMN folder TEXT;

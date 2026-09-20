@@ -1381,6 +1381,8 @@ app.post('/api/sites/:siteId/pages', async (c) => {
       ? body.slug
       : `/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     sortOrder: count.length,
+    parentId: null,
+    folder: null,
     homepage: count.length === 0,
     showInNavigation: true,
     passwordProtected: false,
@@ -1563,6 +1565,25 @@ app.put('/api/sites/:siteId/project', async (c) => {
         'Content editor does not have permission for every page',
       );
   }
+  const incomingIds = new Set((body.project.pages ?? []).map((item) => String(item.id)));
+  const parents = new Map(
+    (body.project.pages ?? []).map((item) => [
+      String(item.id),
+      item.parentId ? String(item.parentId) : null,
+    ]),
+  );
+  for (const [pageId, parentId] of parents) {
+    if (parentId && !incomingIds.has(parentId))
+      return jsonError(c, 400, 'VALIDATION_ERROR', `Parent page ${parentId} is not in this site`);
+    const seen = new Set<string>();
+    let cursor: string | null = pageId;
+    while (cursor) {
+      if (seen.has(cursor))
+        return jsonError(c, 400, 'VALIDATION_ERROR', 'Page hierarchy contains a cycle');
+      seen.add(cursor);
+      cursor = parents.get(cursor) ?? null;
+    }
+  }
   const nextRevision = record.site.currentRevision + 1;
   const pageUpdates = (body.project.pages ?? []).map((item, index) =>
     db
@@ -1570,6 +1591,8 @@ app.put('/api/sites/:siteId/project', async (c) => {
       .set({
         name: String(item.name ?? `Page ${index + 1}`),
         slug: String(item.slug ?? `/page-${index + 1}`),
+        parentId: item.parentId ? String(item.parentId) : null,
+        folder: item.folder ? String(item.folder).trim() || null : null,
         projectData: JSON.stringify(item.projectData ?? null),
         sortOrder: index,
         updatedAt: now,
@@ -1681,6 +1704,8 @@ app.post('/api/sites/:siteId/revisions/:revisionId/restore', async (c) => {
         name: item.name,
         slug: item.slug,
         sortOrder: item.sortOrder,
+        parentId: item.parentId ?? null,
+        folder: item.folder ?? null,
         homepage: item.homepage,
         showInNavigation: item.showInNavigation,
         passwordProtected: item.passwordProtected,
@@ -2258,6 +2283,8 @@ function projectFromRows(
       id: item.id,
       name: item.name,
       slug: item.slug,
+      parentId: item.parentId ?? undefined,
+      folder: item.folder ?? undefined,
       projectData: JSON.parse(item.projectData),
       updatedAt: new Date(item.updatedAt).toISOString(),
       isHomepage: item.homepage,
@@ -2286,6 +2313,8 @@ function toPage(item: typeof page.$inferSelect) {
     id: item.id,
     name: item.name,
     slug: item.slug,
+    parentId: item.parentId ?? undefined,
+    folder: item.folder ?? undefined,
     projectData: JSON.parse(item.projectData),
     updatedAt: new Date(item.updatedAt).toISOString(),
     isHomepage: item.homepage,

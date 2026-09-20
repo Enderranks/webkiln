@@ -5,6 +5,8 @@ export interface PublishedPage {
   name: string;
   slug: string;
   sortOrder: number;
+  parentId?: string;
+  folder?: string;
   homepage: boolean;
   showInNavigation: boolean;
   passwordProtected: boolean;
@@ -115,6 +117,8 @@ export function createPublishedSnapshot(
         name: page.name,
         slug: normalizeSlug(page.slug),
         sortOrder: index,
+        parentId: page.parentId,
+        folder: page.folder,
         homepage: Boolean(page.isHomepage),
         showInNavigation: page.settings?.showInNavigation !== false,
         passwordProtected: page.settings?.passwordProtected === true,
@@ -174,14 +178,20 @@ export function publicHtml(
       publicUrl,
       'noindex',
     );
-  const navigation = snapshot.pages
+  const navigationPages = snapshot.pages
     .filter((item) => item.showInNavigation && item.slug !== '/404')
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(
-      (item) =>
-        `<a href="${publicUrl}${item.slug === '/' ? '' : item.slug}">${escapeText(item.name)}</a>`,
-    )
-    .join('');
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const renderNavigation = (parentId?: string): string => {
+    const children = navigationPages.filter((item) => (item.parentId ?? undefined) === parentId);
+    if (!children.length) return '';
+    return `<ul>${children
+      .map(
+        (item) =>
+          `<li><a href="${publicUrl}${item.slug === '/' ? '' : item.slug}">${escapeText(item.name)}</a>${renderNavigation(item.id)}</li>`,
+      )
+      .join('')}</ul>`;
+  };
+  const navigation = renderNavigation();
   const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a><nav>${navigation}</nav></header><main>${page.html}</main>`;
   return pageShell(
     page.seo.title || snapshot.site.title,

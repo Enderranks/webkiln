@@ -74,6 +74,8 @@ export const page = sqliteTable(
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
+    parentId: text('parent_id'),
+    folder: text('folder'),
     homepage: integer('homepage', { mode: 'boolean' }).notNull().default(false),
     showInNavigation: integer('show_in_navigation', { mode: 'boolean' }).notNull().default(true),
     passwordProtected: integer('password_protected', { mode: 'boolean' }).notNull().default(false),

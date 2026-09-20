@@ -58,4 +58,33 @@ describe('published site snapshots', () => {
     expect(html).not.toContain('Hidden</a>');
     expect(html).not.toContain('Hidden</a>');
   });
+
+  it('preserves parent pages in public navigation', () => {
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: { components: '<h1>Home</h1>' },
+        updatedAt: '',
+        isHomepage: true,
+        seo: { title: 'Home', description: '' },
+        settings: { showInNavigation: true, passwordProtected: false },
+      },
+      {
+        id: 'child',
+        name: 'Child',
+        slug: '/child',
+        parentId: 'home',
+        projectData: { components: '<h1>Child</h1>' },
+        updatedAt: '',
+        seo: { title: 'Child', description: '' },
+        settings: { showInNavigation: true, passwordProtected: false },
+      },
+    ];
+    const snapshot = createPublishedSnapshot(project);
+    expect(snapshot.pages.find((page) => page.id === 'child')?.parentId).toBe('home');
+    expect(publicHtml(snapshot, snapshot.pages[0], 'https://example.test')).toContain('<ul>');
+  });
 });
