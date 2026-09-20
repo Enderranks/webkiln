@@ -21,6 +21,7 @@ import {
   moveMenuItem,
   removeMenuItem,
 } from '../models/menu-manager';
+import { getLayoutPresetStyles, LAYOUT_CONTROLS, type LayoutPreset } from './layout-presets';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -847,6 +848,7 @@ export class WebKilnEditorController {
       'letter-spacing',
       'text-align',
     ]);
+    this.renderLayoutPresets(host);
     this.renderStyleGroup(host, 'Layout', [
       'width',
       'max-width',
@@ -865,6 +867,42 @@ export class WebKilnEditorController {
       'box-shadow',
       'opacity',
     ]);
+  }
+
+  private renderLayoutPresets(host: HTMLElement): void {
+    if (!this.selected) return;
+    const details = document.createElement('details');
+    details.className = 'layout-presets';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Layout preset';
+    details.append(summary);
+    const copy = document.createElement('p');
+    copy.className = 'panel-note';
+    copy.textContent = 'Apply a predictable layout foundation, then refine its controls below.';
+    details.append(copy);
+    const presetRow = document.createElement('div');
+    presetRow.className = 'preset-grid';
+    (['stack', 'flex', 'grid', 'container', 'free-position'] as LayoutPreset[]).forEach(
+      (preset) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ghost-btn';
+        button.dataset.layoutPreset = preset;
+        button.textContent =
+          preset === 'free-position' ? 'Free position' : preset[0].toUpperCase() + preset.slice(1);
+        button.addEventListener('click', () => {
+          if (!this.selected) return;
+          this.adapter.updateStyles(this.selected, getLayoutPresetStyles(preset));
+          this.renderDynamicInspector('content');
+          this.toast('Layout updated', `${button.textContent} preset applied.`);
+        });
+        presetRow.append(button);
+      },
+    );
+    details.append(presetRow);
+    host.append(details);
+    this.renderStyleGroup(host, 'Layout controls', [...LAYOUT_CONTROLS]);
   }
 
   private renderStyleGroup(host: HTMLElement, title: string, properties: string[]): void {
