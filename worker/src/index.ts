@@ -1233,6 +1233,13 @@ app.post('/api/collections/:collectionId/records', async (c) => {
       createdAt: now,
       updatedAt: now,
     });
+  await runAutomations(c, access.collection.workspaceId, 'collection.record_created', id, {
+    collectionId: access.collection.id,
+    recordId: id,
+    slug,
+    status: body.status === 'published' ? 'published' : 'draft',
+    data,
+  });
   return c.json(
     {
       id,
@@ -1293,6 +1300,18 @@ app.patch('/api/records/:recordId', async (c) => {
       updatedAt: now,
     })
     .where(eq(cmsRecord.id, row.record.id));
+  await runAutomations(c, row.record.workspaceId, 'collection.record_updated', row.record.id, {
+    collectionId: row.record.collectionId,
+    recordId: row.record.id,
+    slug: row.record.slug,
+    status:
+      body.status === 'published'
+        ? 'published'
+        : body.status === 'draft'
+          ? 'draft'
+          : row.record.status,
+    data,
+  });
   return c.json({
     ...row.record,
     data,
@@ -1865,6 +1884,11 @@ app.put('/api/sites/:siteId/project', async (c) => {
     createdAt: now,
   });
   for (const update of pageUpdates) await update;
+  await runAutomations(c, record.site.workspaceId, 'revision.created', String(nextRevision), {
+    siteId: record.site.id,
+    revision: nextRevision,
+    source: 'autosave',
+  });
   return c.json({ serverRevision: nextRevision });
 });
 
@@ -1907,6 +1931,11 @@ app.post('/api/sites/:siteId/revisions', async (c) => {
       .set({ currentRevision: revision.revisionNumber, updatedAt: now, updatedBy: record.user.id })
       .where(eq(site.id, record.site.id)),
   ]);
+  await runAutomations(c, record.site.workspaceId, 'revision.created', revision.id, {
+    siteId: record.site.id,
+    revision: revision.revisionNumber,
+    source: 'named_revision',
+  });
   return c.json(revision, 201);
 });
 
@@ -1965,6 +1994,12 @@ app.post('/api/sites/:siteId/revisions/:revisionId/restore', async (c) => {
     .update(site)
     .set({ currentRevision: safety.revisionNumber, updatedAt: now, updatedBy: record.user.id })
     .where(eq(site.id, record.site.id));
+  await runAutomations(c, record.site.workspaceId, 'revision.created', safety.id, {
+    siteId: record.site.id,
+    revision: safety.revisionNumber,
+    source: 'restore',
+    restoredRevision: selected.revisionNumber,
+  });
   return c.json({
     serverRevision: safety.revisionNumber,
     restoredRevision: selected.revisionNumber,
