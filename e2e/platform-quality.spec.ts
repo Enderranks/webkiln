@@ -68,6 +68,12 @@ test.describe('WebKiln platform quality', () => {
     expect((await response.json()).error.code).toBe('UNAUTHENTICATED');
   });
 
+  test('protected customer route aliases redirect to sign-in', async ({ page }) => {
+    test.skip(!process.env.WEBKILN_E2E_BASE_URL, 'Requires a deployed Worker base URL');
+    await page.goto('/site/site-that-does-not-exist/cms');
+    await expect(page).toHaveURL(/\/login\?returnTo=/);
+  });
+
   test('API rejects a cross-origin mutation', async ({ request }) => {
     test.skip(!process.env.WEBKILN_E2E_BASE_URL, 'Requires a deployed Worker base URL');
     const response = await request.post('/api/workspaces', {
