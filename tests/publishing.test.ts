@@ -129,4 +129,33 @@ describe('published site snapshots', () => {
     expect(html).toContain('https://docs.example.test');
     expect(html).not.toContain('javascript:');
   });
+  it('renders drawer navigation as a native accessible disclosure', () => {
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: { components: '<h1>Home</h1>' },
+        updatedAt: '',
+        isHomepage: true,
+        seo: { title: 'Home', description: '' },
+        settings: { showInNavigation: true, passwordProtected: false },
+      },
+    ];
+    project.editorSettings!.menus = [
+      {
+        id: 'main',
+        name: 'Main',
+        mobileMode: 'drawer',
+        items: [
+          { id: 'home', label: 'Home', type: 'page', pageId: project.pages[0].id, children: [] },
+        ],
+      },
+    ];
+    const snapshot = createPublishedSnapshot(project);
+    const html = publicHtml(snapshot, snapshot.pages[0], 'https://example.test');
+    expect(html).toContain('<details class="wk-nav-drawer">');
+    expect(html).not.toContain('<script');
+  });
 });

@@ -235,7 +235,12 @@ export function publicHtml(
   const renderMenuItems = (items: PublishedMenuItem[]): string =>
     `<ul>${items.map((item) => `<li><a href="${escapeAttribute(item.href.startsWith('/') ? publicUrl + (item.href === '/' ? '' : item.href) : item.href)}">${escapeText(item.label)}</a>${renderMenuItems(item.children)}</li>`).join('')}</ul>`;
   const navigation = menu ? renderMenuItems(menu.items) : renderNavigation();
-  const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a><nav>${navigation}</nav></header><main>${page.html}</main>`;
+  const navigationClass = menu ? `wk-nav wk-nav-${menu.mobileMode}` : 'wk-nav wk-nav-stack';
+  const navigationMarkup =
+    menu?.mobileMode === 'drawer'
+      ? `<details class="wk-nav-drawer"><summary>Menu</summary><nav class="${navigationClass}">${navigation}</nav></details>`
+      : `<nav class="${navigationClass}">${navigation}</nav>`;
+  const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a>${navigationMarkup}</header><main>${page.html}</main>`;
   return pageShell(
     page.seo.title || snapshot.site.title,
     page.seo.description || snapshot.site.description,
@@ -257,7 +262,7 @@ function pageShell(
   const safeTitle = escapeText(title);
   const safeDescription = escapeAttribute(description);
   const safeCanonical = escapeAttribute(canonical);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><meta name="description" content="${safeDescription}"><meta name="robots" content="${escapeAttribute(robots)}"><link rel="canonical" href="${safeCanonical}"><meta property="og:title" content="${safeTitle}"><meta property="og:description" content="${safeDescription}"><meta property="og:url" content="${safeCanonical}"><style>${css}</style><style>body{margin:0}.wk-header{display:flex;justify-content:space-between;gap:24px;padding:18px 6%;align-items:center}.wk-header nav{display:flex;gap:18px}.wk-header a{color:inherit;text-decoration:none}.wk-password,.wk-not-found{max-width:640px;margin:15vh auto;padding:24px;font-family:system-ui,sans-serif}.wk-password form{display:flex;gap:8px}.wk-password input,.wk-password button{padding:10px}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><meta name="description" content="${safeDescription}"><meta name="robots" content="${escapeAttribute(robots)}"><link rel="canonical" href="${safeCanonical}"><meta property="og:title" content="${safeTitle}"><meta property="og:description" content="${safeDescription}"><meta property="og:url" content="${safeCanonical}"><style>${css}</style><style>body{margin:0}.wk-header{display:flex;justify-content:space-between;gap:24px;padding:18px 6%;align-items:center}.wk-header a{color:inherit;text-decoration:none}.wk-nav ul{display:flex;gap:18px;list-style:none;margin:0;padding:0}.wk-nav li{position:relative}.wk-nav li ul{display:grid;gap:8px;position:absolute;top:100%;left:0;min-width:160px;padding:12px;background:#111;border:1px solid #333}.wk-nav-scroll{overflow-x:auto}.wk-nav-scroll ul{width:max-content}.wk-nav-drawer{display:none}.wk-nav-drawer summary{cursor:pointer;list-style:none}.wk-nav-drawer summary::-webkit-details-marker{display:none}.wk-password,.wk-not-found{max-width:640px;margin:15vh auto;padding:24px;font-family:system-ui,sans-serif}.wk-password form{display:flex;gap:8px}.wk-password input,.wk-password button{padding:10px}@media(max-width:700px){.wk-header{align-items:flex-start}.wk-nav-stack ul{display:grid;gap:10px}.wk-nav-stack li ul{position:static;margin-top:8px}.wk-nav-drawer{display:block}.wk-nav-drawer .wk-nav{margin-top:12px}.wk-nav-drawer .wk-nav ul{display:grid;gap:10px}.wk-nav-drawer .wk-nav li ul{position:static;margin-top:8px}}</style></head><body>${body}</body></html>`;
 }
 function escapeText(value: string): string {
   return value.replace(
