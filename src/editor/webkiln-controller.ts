@@ -93,7 +93,11 @@ export class WebKilnEditorController {
       this.onSelect((component as Component) ?? null),
     );
     this.adapter.subscribe('update', () => this.scheduleSave());
-    this.adapter.subscribe('device', (device) => this.setCanvasStatus(device as DeviceId));
+    this.adapter.subscribe('device', (device) => {
+      const nextDevice = device as DeviceId;
+      this.syncDeviceButtons(nextDevice);
+      this.setCanvasStatus(nextDevice);
+    });
     this.onSelect(this.adapter.getSelectedComponent());
     this.renderLayers();
     this.renderPages();
@@ -987,14 +991,18 @@ export class WebKilnEditorController {
     if (!['desktop', 'laptop', 'tablet', 'mobile'].includes(device)) return;
     this.device = device;
     this.adapter.setDevice(device);
-    document
-      .querySelectorAll('.device')
-      .forEach((button) =>
-        button.classList.toggle('active', button.getAttribute('data-width') === device),
-      );
+    this.syncDeviceButtons(device);
     const frame = document.querySelector<HTMLElement>('.gjs-frame');
     if (frame) frame.style.maxWidth = `${deviceWidths[device]}px`;
     this.setCanvasStatus(device);
+  }
+
+  private syncDeviceButtons(device: DeviceId): void {
+    document
+      .querySelectorAll<HTMLButtonElement>('.device')
+      .forEach((button) =>
+        button.classList.toggle('active', button.getAttribute('data-width') === device),
+      );
   }
 
   private setCanvasStatus(device: DeviceId): void {
