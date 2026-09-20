@@ -8,6 +8,8 @@ import {
   newPage,
   removePage,
   restorePage,
+  setPageFolder,
+  setPageParent,
   setHomepage,
   uniqueSlug,
 } from '../models/page-manager';
@@ -427,6 +429,37 @@ export class WebKilnEditorController {
         };
         page.updatedAt = new Date().toISOString();
         this.saveNow('Page SEO updated');
+      }
+      if (action === 'parent') {
+        const choices = [
+          'none',
+          ...this.project.pages
+            .filter((item) => item.id !== page.id)
+            .map((item) => `${item.id}:${item.name}`),
+        ];
+        const selected = window.prompt(
+          `Parent page (${choices.join(', ')})`,
+          page.parentId ?? 'none',
+        );
+        if (selected === null) return;
+        const parentId =
+          selected.trim().toLowerCase() === 'none' ? null : selected.split(':', 1)[0];
+        if (!setPageParent(this.project, page.id, parentId)) {
+          this.toast(
+            'Parent not changed',
+            'Choose another page without creating a hierarchy cycle.',
+          );
+          return;
+        }
+        this.renderPages();
+        this.saveNow('Page hierarchy updated');
+      }
+      if (action === 'folder') {
+        const folder = window.prompt('Folder name (leave blank to clear)', page.folder ?? '');
+        if (folder === null) return;
+        setPageFolder(this.project, page.id, folder);
+        this.renderPages();
+        this.saveNow('Page folder updated');
       }
       if (action === 'delete') this.deletePage(page.id);
       if (action === 'up' || action === 'down') this.reorderPage(page.id, action === 'up' ? -1 : 1);
@@ -1031,7 +1064,7 @@ export class WebKilnEditorController {
       row.className = `page-row ${page.id === this.project.currentPageId ? 'active' : ''}`;
       row.dataset.pageId = page.id;
       row.draggable = true;
-      row.innerHTML = `<button data-page-action="open" data-page-id="${escapePageText(page.id)}" class="page-open"><span>▧</span><strong>${escapePageText(page.name)}</strong><small>${page.isHomepage ? 'Home · ' : ''}${escapePageText(page.slug)}${page.settings?.showInNavigation === false ? ' · Hidden' : ''}${page.settings?.passwordProtected ? ' · Protected' : ''}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${escapePageText(page.id)}" aria-label="Set homepage">⌂</button><button data-page-action="rename" data-page-id="${escapePageText(page.id)}" aria-label="Rename page">Aa</button><button data-page-action="seo" data-page-id="${escapePageText(page.id)}" aria-label="Edit SEO">SEO</button><button data-page-action="navigation" data-page-id="${escapePageText(page.id)}" aria-label="Toggle navigation visibility">☰</button><button data-page-action="protect" data-page-id="${escapePageText(page.id)}" aria-label="Toggle page protection">🔒</button><button data-page-action="up" data-page-id="${escapePageText(page.id)}" aria-label="Move page up">↑</button><button data-page-action="down" data-page-id="${escapePageText(page.id)}" aria-label="Move page down">↓</button><button data-page-action="duplicate" data-page-id="${escapePageText(page.id)}" aria-label="Duplicate page">＋</button><button data-page-action="delete" data-page-id="${escapePageText(page.id)}" aria-label="Archive page">×</button></span>`;
+      row.innerHTML = `<button data-page-action="open" data-page-id="${escapePageText(page.id)}" class="page-open"><span>${page.parentId ? '↳' : '▧'}</span><strong>${page.folder ? `${escapePageText(page.folder)} / ` : ''}${escapePageText(page.name)}</strong><small>${page.isHomepage ? 'Home · ' : ''}${escapePageText(page.slug)}${page.settings?.showInNavigation === false ? ' · Hidden' : ''}${page.settings?.passwordProtected ? ' · Protected' : ''}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${escapePageText(page.id)}" aria-label="Set homepage">⌂</button><button data-page-action="rename" data-page-id="${escapePageText(page.id)}" aria-label="Rename page">Aa</button><button data-page-action="parent" data-page-id="${escapePageText(page.id)}" aria-label="Set parent page">↳</button><button data-page-action="folder" data-page-id="${escapePageText(page.id)}" aria-label="Set page folder">▤</button><button data-page-action="seo" data-page-id="${escapePageText(page.id)}" aria-label="Edit SEO">SEO</button><button data-page-action="navigation" data-page-id="${escapePageText(page.id)}" aria-label="Toggle navigation visibility">☰</button><button data-page-action="protect" data-page-id="${escapePageText(page.id)}" aria-label="Toggle page protection">🔒</button><button data-page-action="up" data-page-id="${escapePageText(page.id)}" aria-label="Move page up">↑</button><button data-page-action="down" data-page-id="${escapePageText(page.id)}" aria-label="Move page down">↓</button><button data-page-action="duplicate" data-page-id="${escapePageText(page.id)}" aria-label="Duplicate page">＋</button><button data-page-action="delete" data-page-id="${escapePageText(page.id)}" aria-label="Archive page">×</button></span>`;
       tree.before(row);
     });
     this.project.deletedPages.forEach((page) => {

@@ -118,6 +118,8 @@ export interface PageDocument {
   slug: string;
   projectData: unknown;
   updatedAt: string;
+  parentId?: string;
+  folder?: string;
   isHomepage?: boolean;
   seo?: { title: string; description: string; canonical?: string };
   settings?: { showInNavigation: boolean; passwordProtected: boolean };

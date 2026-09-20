@@ -5,6 +5,8 @@ import {
   newPage,
   removePage,
   restorePage,
+  setPageFolder,
+  setPageParent,
   setHomepage,
   uniqueSlug,
 } from '../src/models/page-manager';
@@ -32,5 +34,20 @@ describe('page manager', () => {
     expect(removePage(project, 'home')?.id).toBe('home');
     expect(project.homepagePageId).toBe(about.id);
     expect(restorePage(project, 'home')?.name).toBe('Home');
+  });
+
+  it('supports folders and parent pages without cycles', () => {
+    const project = createEmptyProject();
+    const home = { ...newPage(project, 'Home'), id: 'home', slug: '/' };
+    const about = { ...newPage(project, 'About'), id: 'about' };
+    const team = { ...newPage(project, 'Team'), id: 'team' };
+    project.pages.push(home, about, team);
+    expect(setPageParent(project, 'about', 'home')).toBe(true);
+    expect(setPageParent(project, 'team', 'about')).toBe(true);
+    expect(setPageParent(project, 'home', 'team')).toBe(false);
+    expect(setPageFolder(project, 'team', 'company')).toBe(true);
+    expect(team.folder).toBe('company');
+    expect(setPageParent(project, 'team', null)).toBe(true);
+    expect(team.parentId).toBeUndefined();
   });
 });

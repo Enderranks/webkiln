@@ -37,9 +37,38 @@ export function setHomepage(project: WebKilnProject, pageId: string): void {
   project.pages.forEach((page) => (page.isHomepage = page.id === pageId));
 }
 
+export function setPageParent(
+  project: WebKilnProject,
+  pageId: string,
+  parentId: string | null,
+): boolean {
+  const page = project.pages.find((item) => item.id === pageId);
+  if (!page || pageId === parentId) return false;
+  if (parentId !== null && !project.pages.some((item) => item.id === parentId)) return false;
+  let cursor: string | undefined = parentId ?? undefined;
+  while (cursor) {
+    if (cursor === pageId) return false;
+    cursor = project.pages.find((item) => item.id === cursor)?.parentId;
+  }
+  if (parentId) page.parentId = parentId;
+  else delete page.parentId;
+  return true;
+}
+
+export function setPageFolder(project: WebKilnProject, pageId: string, folder: string): boolean {
+  const page = project.pages.find((item) => item.id === pageId);
+  if (!page) return false;
+  const normalized = folder.trim().replace(/^\/+|\/+$/g, '');
+  if (normalized) page.folder = normalized;
+  else delete page.folder;
+  return true;
+}
+
 export function duplicatePage(project: WebKilnProject, source: PageDocument): PageDocument {
   const copy = newPage(project, `${source.name} copy`);
   copy.projectData = structuredClone(source.projectData);
+  copy.parentId = source.parentId;
+  copy.folder = source.folder;
   copy.seo = {
     ...(source.seo ?? { title: copy.name, description: '' }),
     title: `${source.name} copy`,

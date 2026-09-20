@@ -26,6 +26,8 @@ function normalizePage(page: Partial<WebKilnProject['pages'][number]>, index: nu
     slug: page.slug ?? (index === 0 ? '/' : `/page-${index + 1}`),
     projectData: page.projectData ?? null,
     updatedAt: page.updatedAt ?? new Date().toISOString(),
+    ...(page.parentId ? { parentId: page.parentId } : {}),
+    ...(page.folder ? { folder: page.folder } : {}),
     isHomepage: page.isHomepage ?? index === 0,
     seo: page.seo ?? { title: page.name ?? '', description: '' },
     settings: page.settings ?? { showInNavigation: true, passwordProtected: false },
