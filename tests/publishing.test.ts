@@ -87,4 +87,46 @@ describe('published site snapshots', () => {
     expect(snapshot.pages.find((page) => page.id === 'child')?.parentId).toBe('home');
     expect(publicHtml(snapshot, snapshot.pages[0], 'https://example.test')).toContain('<ul>');
   });
+  it('publishes an explicit safe menu without exposing editor metadata', () => {
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: { components: '<h1>Home</h1>' },
+        updatedAt: '',
+        isHomepage: true,
+        seo: { title: 'Home', description: '' },
+        settings: { showInNavigation: true, passwordProtected: false },
+      },
+    ];
+    project.editorSettings!.menus = [
+      {
+        id: 'main',
+        name: 'Main',
+        mobileMode: 'drawer',
+        items: [
+          {
+            id: 'docs',
+            label: 'Docs',
+            type: 'external',
+            target: 'https://docs.example.test',
+            children: [],
+          },
+          {
+            id: 'bad',
+            label: 'Bad',
+            type: 'external',
+            target: 'javascript:alert(1)',
+            children: [],
+          },
+        ],
+      },
+    ];
+    const snapshot = createPublishedSnapshot(project);
+    const html = publicHtml(snapshot, snapshot.pages[0], 'https://example.test');
+    expect(html).toContain('https://docs.example.test');
+    expect(html).not.toContain('javascript:');
+  });
 });

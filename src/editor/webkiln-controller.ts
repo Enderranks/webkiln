@@ -14,6 +14,7 @@ import {
   uniqueSlug,
 } from '../models/page-manager';
 import { deterministicSuggestion } from './ai-assist';
+import { addMenuItem, ensureMenus, moveMenuItem, removeMenuItem } from '../models/menu-manager';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -394,6 +395,52 @@ export class WebKilnEditorController {
       .querySelector('#pagesPanel .mini-btn')
       ?.addEventListener('click', () => this.createPage());
     document.querySelector('#pagesPanel')?.addEventListener('click', (event) => {
+      const menuButton = (event.target as HTMLElement).closest<HTMLButtonElement>(
+        '[data-menu-action]',
+      );
+      if (menuButton) {
+        const menus = ensureMenus(this.project);
+        const select = document.querySelector<HTMLSelectElement>('[data-menu-select]');
+        const menu = menus.find((item) => item.id === (select?.value ?? menus[0].id)) ?? menus[0];
+        const action = menuButton.dataset.menuAction;
+        if (action === 'new') {
+          const name = window.prompt('Menu name', 'Footer menu')?.trim();
+          if (name) menus.push({ id: crypto.randomUUID(), name, items: [], mobileMode: 'drawer' });
+        } else if (action === 'add') {
+          const label = window.prompt('Menu label', 'New link')?.trim();
+          if (!label) return;
+          const target = window
+            .prompt('Target: page:<page id>, #anchor, or https://…', 'page:home')
+            ?.trim();
+          if (!target) return;
+          const pageTarget = target.startsWith('page:') ? target.slice(5) : undefined;
+          const type = pageTarget
+            ? 'page'
+            : target.startsWith('#')
+              ? 'anchor'
+              : /^https?:/i.test(target)
+                ? 'external'
+                : 'button';
+          addMenuItem(menu, label, type, pageTarget ? '' : target, pageTarget);
+        } else {
+          const row = menuButton.closest<HTMLElement>('[data-menu-item]');
+          const itemId = row?.dataset.menuItem;
+          if (itemId && action === 'delete') removeMenuItem(menu, itemId);
+          if (itemId && action === 'up') moveMenuItem(menu, itemId, -1);
+          if (itemId && action === 'down') moveMenuItem(menu, itemId, 1);
+          if (itemId && action === 'edit') {
+            const item = menu.items.find((entry) => entry.id === itemId);
+            const label = item && window.prompt('Menu label', item.label)?.trim();
+            if (item && label) item.label = label;
+          }
+        }
+        this.renderMenus(
+          document.querySelector('#pagesPanel')!,
+          document.querySelector('#siteTree')!,
+        );
+        this.scheduleSave('Menu updated');
+        return;
+      }
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-page-action]');
       if (!button) return;
       const page = this.project.pages.find((item) => item.id === button.dataset.pageId);
@@ -1080,6 +1127,7 @@ export class WebKilnEditorController {
     const panel = document.querySelector('#pagesPanel');
     const tree = document.querySelector('#siteTree');
     if (!panel || !tree) return;
+    this.renderMenus(panel, tree);
     panel.querySelectorAll('.page-row, .deleted-page-row').forEach((row) => row.remove());
     [...this.project.pages].reverse().forEach((page) => {
       const row = document.createElement('div');
@@ -1094,6 +1142,35 @@ export class WebKilnEditorController {
       row.className = 'deleted-page-row';
       row.innerHTML = `<span>↺ ${escapePageText(page.name)}</span><button data-page-action="restore" data-page-id="${escapePageText(page.id)}">Restore</button>`;
       tree.before(row);
+    });
+  }
+
+  private renderMenus(panel: Element, before: Element): void {
+    const menus = ensureMenus(this.project);
+    let manager = panel.querySelector<HTMLElement>('[data-menu-manager]');
+    if (!manager) {
+      manager = document.createElement('section');
+      manager.dataset.menuManager = 'true';
+      manager.className = 'menu-manager';
+      before.before(manager);
+    }
+    const selectedId =
+      manager.querySelector<HTMLSelectElement>('[data-menu-select]')?.value ?? menus[0].id;
+    const menu = menus.find((item) => item.id === selectedId) ?? menus[0];
+    const renderItems = (items: typeof menu.items, depth = 0): string =>
+      items
+        .map(
+          (item) =>
+            `<div class="menu-item-row" style="--menu-depth:${depth}" data-menu-item="${escapePageText(item.id)}"><span>${item.type === 'page' ? '▧' : item.type === 'external' ? '↗' : '•'}</span><strong>${escapePageText(item.label)}</strong><small>${escapePageText(item.target ?? item.pageId ?? '')}</small><button type="button" data-menu-action="up" aria-label="Move item up">↑</button><button type="button" data-menu-action="down" aria-label="Move item down">↓</button><button type="button" data-menu-action="edit" aria-label="Edit menu item">Aa</button><button type="button" data-menu-action="delete" aria-label="Delete menu item">×</button></div>${renderItems(item.children ?? [], depth + 1)}`,
+        )
+        .join('');
+    manager.innerHTML = `<div class="menu-manager-head"><div><p class="eyebrow">Navigation</p><strong>Menu manager</strong></div><button type="button" class="mini-btn" data-menu-action="new">＋</button></div><div class="menu-manager-controls"><select data-menu-select aria-label="Select menu">${menus.map((item) => `<option value="${escapePageText(item.id)}" ${item.id === menu.id ? 'selected' : ''}>${escapePageText(item.name)}</option>`).join('')}</select><select data-menu-mobile aria-label="Mobile navigation behavior"><option value="drawer" ${menu.mobileMode === 'drawer' ? 'selected' : ''}>Mobile drawer</option><option value="stack" ${menu.mobileMode === 'stack' ? 'selected' : ''}>Stack links</option><option value="scroll" ${menu.mobileMode === 'scroll' ? 'selected' : ''}>Horizontal scroll</option></select><button type="button" class="ghost-btn" data-menu-action="add">Add item</button></div><div class="menu-item-list">${renderItems(menu.items) || '<small class="panel-note">No items yet. Add a page, external link, anchor, or button.</small>'}</div>`;
+    manager
+      .querySelector('[data-menu-select]')
+      ?.addEventListener('change', () => this.renderMenus(panel, before));
+    manager.querySelector('[data-menu-mobile]')?.addEventListener('change', (event) => {
+      menu.mobileMode = (event.target as HTMLSelectElement).value as 'drawer' | 'stack' | 'scroll';
+      this.scheduleSave('Menu behavior changed');
     });
   }
 

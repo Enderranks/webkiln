@@ -1,4 +1,4 @@
-import type { WebKilnProject } from '../../src/types';
+import type { MenuItem, WebKilnProject } from '../../src/types';
 
 export interface PublishedPage {
   id: string;
@@ -14,11 +14,24 @@ export interface PublishedPage {
   html: string;
   css: string;
 }
+export interface PublishedMenuItem {
+  id: string;
+  label: string;
+  href: string;
+  children: PublishedMenuItem[];
+}
+export interface PublishedMenu {
+  id: string;
+  name: string;
+  mobileMode: 'stack' | 'drawer' | 'scroll';
+  items: PublishedMenuItem[];
+}
 
 export interface PublishedSnapshot {
   schemaVersion: number;
   site: { title: string; description: string };
   pages: PublishedPage[];
+  menus?: PublishedMenu[];
   custom404?: PublishedPage;
   publishedAt: string;
 }
@@ -132,13 +145,40 @@ export function createPublishedSnapshot(
       };
     });
   const custom404 = pages.find((page) => page.slug === '/404');
+  const menus = project.editorSettings?.menus?.map((menu) => ({
+    id: menu.id,
+    name: menu.name,
+    mobileMode: menu.mobileMode,
+    items: publishMenuItems(menu.items, pages),
+  }));
   return {
     schemaVersion: project.schemaVersion,
     site: { title: project.site.title, description: project.site.description },
     pages,
+    ...(menus?.length ? { menus } : {}),
     custom404,
     publishedAt,
   };
+}
+
+function publishMenuItems(items: MenuItem[], pages: PublishedPage[]): PublishedMenuItem[] {
+  return items.map((item) => {
+    const page = item.pageId ? pages.find((candidate) => candidate.id === item.pageId) : undefined;
+    const rawHref =
+      item.type === 'page' && page
+        ? page.slug
+        : item.type === 'anchor' && item.target?.startsWith('#')
+          ? item.target
+          : item.type === 'external' && /^https?:\/\//i.test(item.target ?? '')
+            ? item.target
+            : '#';
+    return {
+      id: item.id,
+      label: item.label,
+      href: rawHref || '#',
+      children: publishMenuItems(item.children ?? [], pages),
+    };
+  });
 }
 
 export function normalizeSlug(slug: string): string {
@@ -191,7 +231,10 @@ export function publicHtml(
       )
       .join('')}</ul>`;
   };
-  const navigation = renderNavigation();
+  const menu = snapshot.menus?.find((item) => item.id === 'main') ?? snapshot.menus?.[0];
+  const renderMenuItems = (items: PublishedMenuItem[]): string =>
+    `<ul>${items.map((item) => `<li><a href="${escapeAttribute(item.href.startsWith('/') ? publicUrl + (item.href === '/' ? '' : item.href) : item.href)}">${escapeText(item.label)}</a>${renderMenuItems(item.children)}</li>`).join('')}</ul>`;
+  const navigation = menu ? renderMenuItems(menu.items) : renderNavigation();
   const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a><nav>${navigation}</nav></header><main>${page.html}</main>`;
   return pageShell(
     page.seo.title || snapshot.site.title,

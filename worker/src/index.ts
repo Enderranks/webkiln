@@ -2479,6 +2479,7 @@ function projectFromRows(
     currentPageId: rows.find((item) => item.homepage)?.id ?? rows[0]?.id ?? 'home',
     homepagePageId: rows.find((item) => item.homepage)?.id ?? rows[0]?.id ?? 'home',
     themeTokens: JSON.parse(record.themeData),
+    editorSettings: JSON.parse(record.editorSettings ?? '{}'),
     assets: [],
     customCode: { html: '', css: '', javascript: '', isolated: true },
     revisions: [],

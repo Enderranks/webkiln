@@ -86,6 +86,7 @@ export interface EditorSettings {
   responsiveIntents: Record<string, ResponsiveComponentMetadata>;
   designSystem?: DesignSystem;
   interactions?: InteractionDefinition[];
+  menus?: MenuDefinition[];
 }
 
 export interface DesignToken {
@@ -99,6 +100,21 @@ export interface DesignSystem {
   componentVariants: Record<string, Array<{ name: string; styles: Record<string, string> }>>;
   linkedComponents: Record<string, string[]>;
   globalRegions: { navigation?: string; footer?: string; announcement?: string };
+}
+export type MenuItemType = 'page' | 'external' | 'anchor' | 'button' | 'dropdown';
+export interface MenuItem {
+  id: string;
+  label: string;
+  type: MenuItemType;
+  target?: string;
+  pageId?: string;
+  children?: MenuItem[];
+}
+export interface MenuDefinition {
+  id: string;
+  name: string;
+  items: MenuItem[];
+  mobileMode: 'stack' | 'drawer' | 'scroll';
 }
 
 export interface SiteMetadata {
