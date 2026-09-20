@@ -108,6 +108,7 @@ export interface SiteMetadata {
   language: string;
   timezone: string;
   businessType?: string;
+  goal?: string;
   seoEnabled?: boolean;
   analyticsPlaceholder?: boolean;
 }

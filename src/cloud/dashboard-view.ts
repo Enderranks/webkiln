@@ -5,6 +5,7 @@ import type { LocalProjectStorage } from '../storage/project-storage';
 import { createMigrationBackup, previewLocalProject } from './local-import';
 import { findDuplicateAssetIds } from '../assets/asset-storage';
 import { createProjectBackup, createStaticExport } from '../portability/export';
+import { WEBKILN_TEMPLATES } from './template-catalog';
 
 const esc = (value: string) =>
   value.replace(
@@ -150,12 +151,7 @@ export async function renderDashboard(
       });
   };
   const renderTemplates = () => {
-    const templates = [
-      ['Editorial studio', 'A composed starting point for a thoughtful brand.'],
-      ['Launch page', 'A focused page for a product, service, or announcement.'],
-      ['Portfolio system', 'A flexible home for work, case studies, and ideas.'],
-    ];
-    view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Templates</p><h1>Start with a point of view.</h1><p>Each template is a real website starting point, not a decorative demo.</p></div></div><div class="template-grid">${templates.map(([name, description]) => `<article class="template-card"><div class="template-preview"><span></span><i></i><b></b></div><p class="eyebrow">WebKiln template</p><h2>${name}</h2><p>${description}</p><button class="ghost-btn" type="button" data-template="${name}">Use template</button></article>`).join('')}</div>`;
+    view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Templates</p><h1>Start with a point of view.</h1><p>Each template is a real website starting point, not a decorative demo.</p></div></div><div class="template-grid">${WEBKILN_TEMPLATES.map((template) => `<article class="template-card"><div class="template-preview"><span></span><i></i><b></b></div><p class="eyebrow">${esc(template.category)} · ${esc(template.websiteType)}</p><h2>${esc(template.name)}</h2><p>${esc(template.description)}</p><small>${template.pages.length} starter pages · ${esc(template.goal)} goal</small><button class="ghost-btn" type="button" data-template="${template.id}">Use template</button></article>`).join('')}</div>`;
     document
       .querySelectorAll<HTMLButtonElement>('[data-template]')
       .forEach((button) =>

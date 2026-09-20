@@ -534,6 +534,35 @@
   flex: 1;
   min-width: 190px;
 }
+.onboarding-page-choices {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 22px;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  border: 1px solid #3e3c35;
+  background: #111213;
+  cursor: pointer;
+}
+.check-row:has(input:checked) {
+  border-color: #d6ad61;
+  background: #211f19;
+}
+.check-row input {
+  accent-color: #d6ad61;
+}
+.check-row span {
+  display: grid;
+  gap: 3px;
+}
+.check-row small,
+.template-card > small {
+  color: var(--cloud-muted);
+}
 .website-toolbar label {
   display: grid;
   gap: 6px;
