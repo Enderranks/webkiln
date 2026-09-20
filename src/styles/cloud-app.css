@@ -563,6 +563,12 @@
 .template-card > small {
   color: var(--cloud-muted);
 }
+.record-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
 .website-toolbar label {
   display: grid;
   gap: 6px;

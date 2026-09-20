@@ -204,8 +204,112 @@ export async function renderDashboard(
           const target = document.querySelector<HTMLElement>('[data-collection-records]');
           if (!target) return;
           try {
-            const result = await cloud.listRecords(button.dataset.recordsCollection ?? '');
-            target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><h2>Records</h2><span>${result.total} total · page ${result.page}</span></div>${result.records.map((record) => `<div class="record-row"><strong>${esc(record.slug)}</strong><span class="status-chip ${record.status === 'published' ? 'published' : ''}">${record.status}</span><small>${new Date(record.updatedAt).toLocaleString()}</small></div>`).join('') || empty('No records', 'Add the first record through the collection API or binding workflow.')}</section>`;
+            const collectionId = button.dataset.recordsCollection ?? '';
+            const collection = collections.find((item) => item.id === collectionId);
+            if (!collection) return;
+            let pageNumber = 1;
+            const renderRecordPage = async (page = 1, search = '', status = '') => {
+              const query = new URLSearchParams({ page: String(page), pageSize: '25' });
+              if (search) query.set('search', search);
+              if (status) query.set('status', status);
+              const result = await cloud.listRecords(collectionId, query.toString());
+              pageNumber = result.page;
+              target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><div><h2>${esc(collection.name)} records</h2><span>${result.total} total · page ${result.page}</span></div><button class="primary-btn" type="button" data-new-record>New record</button></div><div class="submission-toolbar"><input type="search" data-record-search placeholder="Search records" aria-label="Search records" value="${esc(search)}" /><select data-record-status aria-label="Filter records"><option value="">All statuses</option><option value="draft" ${status === 'draft' ? 'selected' : ''}>Draft</option><option value="published" ${status === 'published' ? 'selected' : ''}>Published</option></select></div>${result.records.map((record) => `<div class="record-row" data-record-row="${esc(record.id)}"><strong>${esc(record.slug)}</strong><span class="status-chip ${record.status === 'published' ? 'published' : ''}">${record.status}</span><small>${new Date(record.updatedAt).toLocaleString()}</small><button class="ghost-btn" type="button" data-edit-record="${esc(record.id)}">Edit</button><button class="ghost-btn danger-action" type="button" data-delete-record="${esc(record.id)}">Delete</button></div>`).join('') || empty('No records', 'Create the first record for this collection.')}<div class="record-pagination"><button class="ghost-btn" type="button" data-record-prev ${result.page <= 1 ? 'disabled' : ''}>Previous</button><button class="ghost-btn" type="button" data-record-next ${result.page * result.pageSize >= result.total ? 'disabled' : ''}>Next</button></div></section>`;
+              target
+                .querySelector('[data-record-search]')
+                ?.addEventListener(
+                  'change',
+                  () =>
+                    void renderRecordPage(
+                      1,
+                      (
+                        target.querySelector<HTMLInputElement>('[data-record-search]')?.value ?? ''
+                      ).trim(),
+                      target.querySelector<HTMLSelectElement>('[data-record-status]')?.value ?? '',
+                    ),
+                );
+              target
+                .querySelector('[data-record-status]')
+                ?.addEventListener(
+                  'change',
+                  () =>
+                    void renderRecordPage(
+                      1,
+                      target
+                        .querySelector<HTMLInputElement>('[data-record-search]')
+                        ?.value.trim() ?? '',
+                      target.querySelector<HTMLSelectElement>('[data-record-status]')?.value ?? '',
+                    ),
+                );
+              target
+                .querySelector('[data-record-prev]')
+                ?.addEventListener(
+                  'click',
+                  () => void renderRecordPage(pageNumber - 1, search, status),
+                );
+              target
+                .querySelector('[data-record-next]')
+                ?.addEventListener(
+                  'click',
+                  () => void renderRecordPage(pageNumber + 1, search, status),
+                );
+              target.querySelector('[data-new-record]')?.addEventListener('click', async () => {
+                const value = window.prompt(
+                  'Record JSON',
+                  '{"title":"New record","slug":"new-record"}',
+                );
+                if (!value) return;
+                try {
+                  const data = JSON.parse(value) as Record<string, unknown>;
+                  await cloud.createRecord(collectionId, data, 'draft');
+                  say('Draft record created.');
+                  await renderRecordPage(pageNumber, search, status);
+                } catch (error) {
+                  say(
+                    error instanceof Error
+                      ? error.message
+                      : 'Record JSON is invalid or could not be saved.',
+                  );
+                }
+              });
+              target.querySelectorAll<HTMLButtonElement>('[data-edit-record]').forEach((action) =>
+                action.addEventListener('click', async () => {
+                  const record = result.records.find(
+                    (item) => item.id === action.dataset.editRecord,
+                  );
+                  if (!record) return;
+                  const value = window.prompt('Record JSON', JSON.stringify(record.data));
+                  if (!value) return;
+                  try {
+                    await cloud.updateRecord(
+                      record.id,
+                      JSON.parse(value) as Record<string, unknown>,
+                    );
+                    say('Record updated.');
+                    await renderRecordPage(pageNumber, search, status);
+                  } catch (error) {
+                    say(
+                      error instanceof Error
+                        ? error.message
+                        : 'Record JSON is invalid or could not be updated.',
+                    );
+                  }
+                }),
+              );
+              target.querySelectorAll<HTMLButtonElement>('[data-delete-record]').forEach((action) =>
+                action.addEventListener('click', async () => {
+                  if (!window.confirm('Delete this record?')) return;
+                  try {
+                    await cloud.deleteRecord(action.dataset.deleteRecord ?? '');
+                    say('Record deleted.');
+                    await renderRecordPage(pageNumber, search, status);
+                  } catch (error) {
+                    say(error instanceof Error ? error.message : 'Could not delete record.');
+                  }
+                }),
+              );
+            };
+            await renderRecordPage();
           } catch (error) {
             say(error instanceof Error ? error.message : 'Could not load records.');
           }
