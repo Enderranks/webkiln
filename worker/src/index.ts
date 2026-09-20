@@ -35,6 +35,7 @@ import {
   hashPassword,
   normalizeSlug,
   publicHtml,
+  formatPublicValue,
   type PublishedSnapshot,
 } from './publishing';
 import type { WebKilnProject } from '../../src/types';
@@ -2106,6 +2107,7 @@ async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string)
   for (const match of matches) {
     const [whole, tag, attributes, collectionId, field, fallbackContent] = match;
     const repeat = /data-wk-repeat=["']true["']/i.test(attributes);
+    const format = attributes.match(/data-wk-format=["']([^"']*)["']/i)?.[1] ?? 'plain';
     const fallback = attributes.match(/data-wk-fallback=["']([^"']*)["']/i)?.[1] ?? fallbackContent;
     const emptyBehavior = attributes.match(/data-wk-empty=["']([^"']*)["']/i)?.[1] ?? 'hide';
     const rows = await getDb(c.env.DB)
@@ -2115,7 +2117,7 @@ async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string)
       .limit(100)
       .all();
     const value = (row: typeof cmsRecord.$inferSelect) =>
-      escapePublicText(String(jsonValue(row.data, {})[field] ?? ''));
+      escapePublicText(formatPublicValue(jsonValue(row.data, {})[field], format));
     const content = rows.length
       ? repeat
         ? rows.map(value).join('')
@@ -2133,7 +2135,7 @@ async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string)
 }
 function stripBindingAttributes(attributes: string): string {
   return attributes.replace(
-    /\s+data-wk-(?:collection|field|fallback|empty|repeat)=(?:"[^"]*"|'[^']*')/gi,
+    /\s+data-wk-(?:collection|field|fallback|empty|repeat|format|preview)=(?:"[^"]*"|'[^']*')/gi,
     '',
   );
 }

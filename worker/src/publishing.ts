@@ -53,6 +53,19 @@ export function sanitizeCss(input: string): string {
     .trim();
 }
 
+export function formatPublicValue(value: unknown, format: string): string {
+  const text = String(value ?? '');
+  if (format === 'uppercase') return text.toUpperCase();
+  if (format === 'lowercase') return text.toLowerCase();
+  if (format === 'date') {
+    const date = new Date(text);
+    return Number.isNaN(date.valueOf())
+      ? text
+      : new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(date);
+  }
+  return text;
+}
+
 function componentToHtml(component: unknown): string {
   if (typeof component === 'string') return component;
   if (Array.isArray(component)) return component.map(componentToHtml).join('');

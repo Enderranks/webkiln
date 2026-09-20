@@ -29,14 +29,34 @@ export class DynamicBindingController {
     const card = document.createElement('section');
     card.dataset.dynamicBinding = 'true';
     card.className = 'recovery-card dynamic-binding-card';
-    card.innerHTML = `<strong>Dynamic content</strong><small>Bind this component to a CMS collection or use it as a repeating list.</small><label class="field">Data source<select data-bind-collection><option value="">Choose collection</option>${this.collections.map((collection) => `<option value="${collection.id}" ${attrs['data-wk-collection'] === collection.id ? 'selected' : ''}>${collection.name}</option>`).join('')}</select></label><label class="field">Field<select data-bind-field><option value="">Choose field</option></select></label><label class="field">Fallback content<input data-bind-fallback value="${attrs['data-wk-fallback'] ?? ''}" placeholder="Shown when empty" /></label><label class="field">Empty behavior<select data-bind-empty><option value="hide">Hide element</option><option value="fallback">Use fallback</option><option value="empty">Show empty state</option></select></label><label class="toggle-row"><span>Repeating list</span><input type="checkbox" data-bind-repeat ${attrs['data-wk-repeat'] === 'true' ? 'checked' : ''} /></label><button type="button" class="primary-btn" data-save-binding>Save binding</button><p class="panel-note">Preview record and formatting are applied at publish time from published CMS records only.</p>`;
+    card.innerHTML = `<strong>Dynamic content</strong><small>Bind this component to a CMS collection or use it as a repeating list.</small><label class="field">Data source<select data-bind-collection><option value="">Choose collection</option>${this.collections.map((collection) => `<option value="${collection.id}" ${attrs['data-wk-collection'] === collection.id ? 'selected' : ''}>${collection.name}</option>`).join('')}</select></label><label class="field">Field<select data-bind-field><option value="">Choose field</option></select></label><label class="field">Fallback content<input data-bind-fallback value="${attrs['data-wk-fallback'] ?? ''}" placeholder="Shown when empty" /></label><label class="field">Formatting<select data-bind-format><option value="plain">Plain text</option><option value="uppercase">Uppercase</option><option value="lowercase">Lowercase</option><option value="date">Localized date</option></select></label><label class="field">Preview record<select data-bind-preview><option value="">Loading records…</option></select></label><label class="field">Empty behavior<select data-bind-empty><option value="hide">Hide element</option><option value="fallback">Use fallback</option><option value="empty">Show empty state</option></select></label><label class="toggle-row"><span>Repeating list</span><input type="checkbox" data-bind-repeat ${attrs['data-wk-repeat'] === 'true' ? 'checked' : ''} /></label><button type="button" class="primary-btn" data-save-binding>Save binding</button><p class="panel-note">Only published records are used on the public site. Preview data stays in editor metadata.</p>`;
     panel.append(card);
     const collectionSelect = card.querySelector<HTMLSelectElement>('[data-bind-collection]');
     const fieldSelect = card.querySelector<HTMLSelectElement>('[data-bind-field]');
+    const previewSelect = card.querySelector<HTMLSelectElement>('[data-bind-preview]');
+    const formatSelect = card.querySelector<HTMLSelectElement>('[data-bind-format]');
+    if (formatSelect) formatSelect.value = attrs['data-wk-format'] ?? 'plain';
     const populateFields = () => {
       const collection = this.collections.find((item) => item.id === collectionSelect?.value);
       if (fieldSelect)
         fieldSelect.innerHTML = `<option value="">Choose field</option>${(collection?.fields ?? []).map((field) => `<option value="${field.slug}" ${attrs['data-wk-field'] === field.slug ? 'selected' : ''}>${field.name}</option>`).join('')}`;
+      if (!collection || !previewSelect) return;
+      previewSelect.innerHTML = '<option value="">No preview record</option>';
+      void this.cloud
+        .listRecords(collection.id, 'status=published&pageSize=20')
+        .then((page) => {
+          previewSelect.innerHTML = page.records.length
+            ? page.records
+                .map(
+                  (record) =>
+                    `<option value="${record.id}" ${attrs['data-wk-preview'] === record.id ? 'selected' : ''}>${record.slug}</option>`,
+                )
+                .join('')
+            : '<option value="">No published records</option>';
+        })
+        .catch(() => {
+          previewSelect.innerHTML = '<option value="">Preview unavailable</option>';
+        });
     };
     collectionSelect?.addEventListener('change', populateFields);
     populateFields();
@@ -45,6 +65,8 @@ export class DynamicBindingController {
       selected.addAttributes({
         'data-wk-collection': collectionSelect?.value ?? '',
         'data-wk-field': fieldSelect?.value ?? '',
+        'data-wk-format': formatSelect?.value ?? 'plain',
+        'data-wk-preview': previewSelect?.value ?? '',
         'data-wk-fallback':
           card.querySelector<HTMLInputElement>('[data-bind-fallback]')?.value ?? '',
         'data-wk-empty':
