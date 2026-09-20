@@ -32,6 +32,13 @@ describe('v14 design system and guardian', () => {
     expect(scanDesignGuardian(project).map((item) => item.id)).toEqual(
       expect.arrayContaining(['alt-home', 'unsafe-home']),
     );
-    expect(healthScores(project).Performance.score).toBeNull();
+    const scores = healthScores(project);
+    expect(scores.Performance.score).toBeNull();
+    expect(scores['Form configuration'].score).toBeNull();
+    expect(scores['Broken links'].basis).toContain('Unavailable');
+    expect(scanDesignGuardian(project).find((item) => item.id === 'unsafe-home')).toMatchObject({
+      affectedComponent: 'Page markup',
+      safe: true,
+    });
   });
 });

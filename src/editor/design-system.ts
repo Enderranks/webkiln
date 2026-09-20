@@ -64,6 +64,7 @@ export interface GuardianFinding {
   explanation: string;
   suggestedFix: string;
   safe: boolean;
+  affectedComponent: string;
 }
 export function scanDesignGuardian(project: WebKilnProject): GuardianFinding[] {
   const findings: GuardianFinding[] = [];
@@ -78,6 +79,7 @@ export function scanDesignGuardian(project: WebKilnProject): GuardianFinding[] {
         explanation: 'One or more images may not have alternative text.',
         suggestedFix: 'Add a concise image description.',
         safe: false,
+        affectedComponent: 'Image content',
       });
     if (raw.includes('onclick=') || raw.includes('javascript:'))
       findings.push({
@@ -88,6 +90,7 @@ export function scanDesignGuardian(project: WebKilnProject): GuardianFinding[] {
         explanation: 'Unsafe inline behavior is present in project data.',
         suggestedFix: 'Remove inline script behavior.',
         safe: true,
+        affectedComponent: 'Page markup',
       });
     if ((raw.match(/font-size/g) ?? []).length > 8)
       findings.push({
@@ -98,6 +101,7 @@ export function scanDesignGuardian(project: WebKilnProject): GuardianFinding[] {
         explanation: 'This page contains many independent typography values.',
         suggestedFix: 'Map text styles to font-size tokens.',
         safe: true,
+        affectedComponent: 'Typography styles',
       });
     if (raw.includes('overflow') || raw.includes('width: 100vw'))
       findings.push({
@@ -108,6 +112,7 @@ export function scanDesignGuardian(project: WebKilnProject): GuardianFinding[] {
         explanation: 'The project may overflow on a narrow viewport.',
         suggestedFix: 'Use a responsive container or horizontal-scroll intent.',
         safe: true,
+        affectedComponent: 'Responsive layout',
       });
   }
   return findings;
@@ -141,6 +146,18 @@ export function healthScores(
     'Security configuration': {
       score: null,
       basis: 'Production headers require a deployed-site check',
+    },
+    'Form configuration': {
+      score: null,
+      basis: 'Unavailable until a site form is selected for review',
+    },
+    'Broken links': {
+      score: null,
+      basis: 'Unavailable until links are crawled in a deployed site',
+    },
+    'Missing content': {
+      score: project.pages.length ? Math.max(0, 100 - warnings * 15) : 0,
+      basis: 'Estimated from available page content checks',
     },
   };
 }

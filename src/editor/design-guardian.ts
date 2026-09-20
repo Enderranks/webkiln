@@ -11,6 +11,7 @@ import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 
 export class DesignGuardianController {
   private system: DesignSystem;
+  private readonly dismissed = new Map<string, string>();
   constructor(
     private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
@@ -30,7 +31,7 @@ export class DesignGuardianController {
     const card = document.createElement('section');
     card.dataset.v14Panel = 'true';
     card.className = 'v14-health-card';
-    card.innerHTML = `<div class="v14-head"><div><p class="eyebrow">V14 system</p><h3>Design system</h3></div><button class="ghost-btn" type="button" data-theme-export>Export</button></div><p class="panel-note">Tokens keep colors, type, spacing, controls, motion, and layout consistent across the site.</p><div class="token-list">${this.system.tokens.map((token) => `<label class="token-row"><span><strong>${token.name}</strong><small>${token.category} · ${tokenUsageCount(this.project, token)} uses</small></span><input data-token="${token.name}" value="${token.value}" aria-label="${token.name}" /></label>`).join('')}</div><div class="v14-actions"><button class="primary-btn" type="button" data-run-guardian>Run Design Guardian</button><button class="ghost-btn" type="button" data-run-health>Site Health Center</button></div><div data-v14-results aria-live="polite"></div>`;
+    card.innerHTML = `<div class="v14-head"><div><p class="eyebrow">V14 system</p><h3>Design system</h3></div><div class="v14-head-actions"><button class="ghost-btn" type="button" data-theme-import>Import</button><button class="ghost-btn" type="button" data-theme-export>Export</button><input type="file" accept="application/json" data-theme-file hidden /></div></div><p class="panel-note">Tokens keep colors, type, spacing, controls, motion, and layout consistent across the site.</p><div class="token-list">${this.system.tokens.map((token) => `<label class="token-row"><span><strong>${token.name}</strong><small>${token.category} · ${tokenUsageCount(this.project, token)} uses</small></span><input data-token="${token.name}" value="${token.value}" aria-label="${token.name}" /></label>`).join('')}</div><div class="v14-actions"><button class="primary-btn" type="button" data-run-guardian>Run Design Guardian</button><button class="ghost-btn" type="button" data-run-health>Site Health Center</button></div><div data-v14-results aria-live="polite"></div>`;
     panel.append(card);
     card.querySelectorAll<HTMLInputElement>('[data-token]').forEach((input) =>
       input.addEventListener('change', () => {
@@ -48,6 +49,23 @@ export class DesignGuardianController {
     card
       .querySelector('[data-theme-export]')
       ?.addEventListener('click', () => this.downloadTheme());
+    card
+      .querySelector('[data-theme-import]')
+      ?.addEventListener('click', () =>
+        card.querySelector<HTMLInputElement>('[data-theme-file]')?.click(),
+      );
+    card
+      .querySelector<HTMLInputElement>('[data-theme-file]')
+      ?.addEventListener('change', async (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        try {
+          this.system = normalizeDesignSystem(JSON.parse(await file.text()) as DesignSystem);
+          this.persist();
+        } catch {
+          this.toast('Theme import failed', 'Choose a valid WebKiln theme JSON file.');
+        }
+      });
   }
   private persist(): void {
     this.project.editorSettings!.designSystem = this.system;
@@ -61,22 +79,63 @@ export class DesignGuardianController {
   private renderGuardian(card: HTMLElement): void {
     const results = card.querySelector<HTMLElement>('[data-v14-results]');
     if (!results) return;
-    const findings = scanDesignGuardian(this.project);
-    results.innerHTML = `<h4>Design Guardian · ${findings.length} findings</h4>${findings.length ? findings.map((item) => `<article class="guardian-finding ${item.severity}"><strong>${item.severity.toUpperCase()} · ${item.pageName}</strong><p>${item.explanation}</p><small>Suggested fix: ${item.suggestedFix}</small>${item.safe ? `<button type="button" data-fix="${item.id}">Apply safe fix</button>` : '<em>Manual review required</em>'}</article>`).join('') : '<p class="health-good">No findings in the available project data.</p>'}`;
+    const findings = scanDesignGuardian(this.project).filter(
+      (item) => !this.dismissed.has(item.id),
+    );
+    results.innerHTML = `<div class="guardian-results-head"><h4>Design Guardian · ${findings.length} findings</h4>${findings.some((item) => item.safe) ? '<button type="button" class="ghost-btn" data-fix-all>Apply all safe fixes</button>' : ''}</div>${findings.length ? findings.map((item) => `<article class="guardian-finding ${item.severity}"><strong>${item.severity.toUpperCase()} · ${item.pageName}</strong><small>Affected component: ${item.affectedComponent}</small><p>${item.explanation}</p><small>Suggested fix: ${item.suggestedFix}</small><div class="guardian-actions"><button type="button" data-select-finding="${item.id}">Select component</button>${item.safe ? `<button type="button" data-fix="${item.id}">Apply safe fix</button>` : ''}<button type="button" data-dismiss-finding="${item.id}">Dismiss</button></div></article>`).join('') : '<p class="health-good">No findings in the available project data.</p>'}`;
+    results.querySelector('[data-fix-all]')?.addEventListener('click', () => {
+      findings.filter((item) => item.safe).forEach((item) => this.applyFix(item));
+      this.dirty();
+      this.renderGuardian(card);
+    });
     results.querySelectorAll<HTMLButtonElement>('[data-fix]').forEach((button) =>
       button.addEventListener('click', () => {
         const finding = findings.find((item) => item.id === button.dataset.fix);
-        const page = this.project.pages.find((item) => item.id === finding?.pageId);
-        if (page && finding?.id.startsWith('unsafe-'))
-          page.projectData = JSON.parse(
-            JSON.stringify(page.projectData)
-              .replace(/onclick\s*=\s*"[^"]*"/gi, '')
-              .replace(/javascript:/gi, ''),
-          );
+        if (finding) this.applyFix(finding);
         this.dirty();
         this.renderGuardian(card);
       }),
     );
+    results.querySelectorAll<HTMLButtonElement>('[data-dismiss-finding]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const reason = window.prompt('Why dismiss this finding?');
+        if (reason?.trim()) {
+          this.dismissed.set(button.dataset.dismissFinding ?? '', reason.trim());
+          this.renderGuardian(card);
+        }
+      }),
+    );
+    results.querySelectorAll<HTMLButtonElement>('[data-select-finding]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const finding = findings.find((item) => item.id === button.dataset.selectFinding);
+        const page = this.project.pages.find((item) => item.id === finding?.pageId);
+        if (page) {
+          this.project.currentPageId = page.id;
+          this.toast(
+            'Component located',
+            `${finding?.affectedComponent ?? 'Finding'} is on ${page.name}.`,
+          );
+        }
+      }),
+    );
+  }
+
+  private applyFix(finding: ReturnType<typeof scanDesignGuardian>[number]): void {
+    const page = this.project.pages.find((item) => item.id === finding.pageId);
+    if (page && finding.id.startsWith('unsafe-'))
+      page.projectData = JSON.parse(
+        JSON.stringify(page.projectData)
+          .replace(/onclick\s*=\s*"[^"]*"/gi, '')
+          .replace(/javascript:/gi, ''),
+      );
+  }
+
+  private toast(title: string, detail: string): void {
+    const toast = document.querySelector('#toast');
+    toast?.querySelector('strong')?.replaceChildren(document.createTextNode(title));
+    toast?.querySelector('small')?.replaceChildren(document.createTextNode(detail));
+    toast?.classList.add('show');
+    window.setTimeout(() => toast?.classList.remove('show'), 2600);
   }
   private renderHealth(card: HTMLElement): void {
     const results = card.querySelector<HTMLElement>('[data-v14-results]');
