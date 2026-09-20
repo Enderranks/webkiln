@@ -37,6 +37,7 @@ export function addMenuItem(
   type: MenuItemType,
   target: string,
   pageId?: string,
+  parentId?: string,
 ): MenuItem {
   const item: MenuItem = {
     id: crypto.randomUUID(),
@@ -45,8 +46,21 @@ export function addMenuItem(
     target: target.trim(),
   };
   if (pageId) item.pageId = pageId;
-  menu.items.push(item);
+  const parent = parentId ? findMenuItem(menu, parentId) : undefined;
+  (parent ? (parent.children ??= []) : menu.items).push(item);
   return item;
+}
+
+export function findMenuItem(menu: MenuDefinition, itemId: string): MenuItem | undefined {
+  const find = (items: MenuItem[]): MenuItem | undefined => {
+    for (const item of items) {
+      if (item.id === itemId) return item;
+      const nested = find(item.children ?? []);
+      if (nested) return nested;
+    }
+    return undefined;
+  };
+  return find(menu.items);
 }
 
 export function removeMenuItem(menu: MenuDefinition, itemId: string): boolean {

@@ -14,7 +14,13 @@ import {
   uniqueSlug,
 } from '../models/page-manager';
 import { deterministicSuggestion } from './ai-assist';
-import { addMenuItem, ensureMenus, moveMenuItem, removeMenuItem } from '../models/menu-manager';
+import {
+  addMenuItem,
+  ensureMenus,
+  findMenuItem,
+  moveMenuItem,
+  removeMenuItem,
+} from '../models/menu-manager';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -413,6 +419,9 @@ export class WebKilnEditorController {
             .prompt('Target: page:<page id>, #anchor, or https://…', 'page:home')
             ?.trim();
           if (!target) return;
+          const parentId = window
+            .prompt('Optional parent item ID for a dropdown (leave blank for top level)', '')
+            ?.trim();
           const pageTarget = target.startsWith('page:') ? target.slice(5) : undefined;
           const type = pageTarget
             ? 'page'
@@ -421,7 +430,14 @@ export class WebKilnEditorController {
               : /^https?:/i.test(target)
                 ? 'external'
                 : 'button';
-          addMenuItem(menu, label, type, pageTarget ? '' : target, pageTarget);
+          addMenuItem(
+            menu,
+            label,
+            type,
+            pageTarget ? '' : target,
+            pageTarget,
+            parentId || undefined,
+          );
         } else {
           const row = menuButton.closest<HTMLElement>('[data-menu-item]');
           const itemId = row?.dataset.menuItem;
@@ -429,7 +445,7 @@ export class WebKilnEditorController {
           if (itemId && action === 'up') moveMenuItem(menu, itemId, -1);
           if (itemId && action === 'down') moveMenuItem(menu, itemId, 1);
           if (itemId && action === 'edit') {
-            const item = menu.items.find((entry) => entry.id === itemId);
+            const item = findMenuItem(menu, itemId);
             const label = item && window.prompt('Menu label', item.label)?.trim();
             if (item && label) item.label = label;
           }
