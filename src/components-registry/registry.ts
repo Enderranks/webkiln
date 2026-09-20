@@ -10,6 +10,12 @@ export interface ComponentDefinition {
   responsive: boolean;
   guidedControls?: string[];
   explanation?: string;
+  smartSection?: {
+    purpose: string;
+    requiredContent: string[];
+    variants: string[];
+    dataSource?: string;
+  };
   migrate?: (value: unknown) => unknown;
 }
 
@@ -196,6 +202,55 @@ const definitions: Array<[string, string, ComponentDefinition['category'], strin
   ],
 ];
 
+const SMART_SECTION_METADATA: Record<string, NonNullable<ComponentDefinition['smartSection']>> = {
+  features: {
+    purpose: 'Explain the strongest benefits in a scannable grid.',
+    requiredContent: ['Section heading', 'At least two benefit titles', 'Benefit descriptions'],
+    variants: ['cards', 'columns', 'stacked'],
+    dataSource: 'Optional CMS collection of features',
+  },
+  services: {
+    purpose: 'Present offerings with clear outcomes and next steps.',
+    requiredContent: ['Section heading', 'Service names', 'Service descriptions'],
+    variants: ['columns', 'stacked', 'compact'],
+    dataSource: 'Optional CMS collection of services',
+  },
+  testimonials: {
+    purpose: 'Build trust with attributed customer proof.',
+    requiredContent: ['Quote', 'Customer name', 'Role or company'],
+    variants: ['quote', 'cards', 'carousel'],
+    dataSource: 'Optional CMS collection of testimonials',
+  },
+  team: {
+    purpose: 'Introduce the people behind the work.',
+    requiredContent: [
+      'Section heading',
+      'Name',
+      'Role',
+      'Accessible image alt text when imagery is added',
+    ],
+    variants: ['cards', 'compact', 'stacked'],
+    dataSource: 'Optional CMS collection of team members',
+  },
+  blog: {
+    purpose: 'Help visitors discover recent stories and updates.',
+    requiredContent: ['Section heading', 'Article title', 'Summary', 'Link'],
+    variants: ['cards', 'list', 'featured'],
+    dataSource: 'Optional CMS collection of posts',
+  },
+  events: {
+    purpose: 'Make dates, venues, and availability easy to scan.',
+    requiredContent: ['Event title', 'Date', 'Venue or online location', 'Availability'],
+    variants: ['cards', 'list', 'calendar'],
+    dataSource: 'Optional CMS collection of events',
+  },
+  'business-hours': {
+    purpose: 'Set accurate visitor expectations for availability.',
+    requiredContent: ['Day labels', 'Opening times', 'Timezone when relevant'],
+    variants: ['table', 'stacked', 'compact'],
+  },
+};
+
 export const componentRegistry: ComponentDefinition[] = definitions.map(
   ([id, displayName, category, defaultContent]) => ({
     id,
@@ -209,6 +264,7 @@ export const componentRegistry: ComponentDefinition[] = definitions.map(
     responsive: true,
     guidedControls: ['content', 'responsive'],
     explanation: 'This component is safe to edit visually and adapts across breakpoints.',
+    ...(SMART_SECTION_METADATA[id] ? { smartSection: SMART_SECTION_METADATA[id] } : {}),
     migrate: (value) => value,
   }),
 );

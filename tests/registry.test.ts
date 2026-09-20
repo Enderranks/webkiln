@@ -44,4 +44,13 @@ describe('component registry', () => {
       ),
     ).toBe(true);
   });
+
+  it('describes smart section purpose, content requirements, and variants', () => {
+    const definition = getComponentDefinition('features');
+    expect(definition?.smartSection).toMatchObject({
+      purpose: expect.any(String),
+      requiredContent: expect.arrayContaining(['Section heading']),
+      variants: expect.arrayContaining(['cards']),
+    });
+  });
 });

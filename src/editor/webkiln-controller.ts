@@ -442,8 +442,62 @@ export class WebKilnEditorController {
     }
     host.replaceChildren();
     if (!this.selected) return;
+    this.renderSmartSectionInspector(host);
     if (tab === 'content') this.renderContentControls(host);
     if (tab === 'advanced') this.renderAdvancedControls(host);
+  }
+
+  private renderSmartSectionInspector(host: HTMLElement): void {
+    if (!this.selected) return;
+    const attributes = (this.selected.getAttributes?.() ?? {}) as Record<string, string>;
+    const type = attributes['data-wk-smart'] || String(this.selected.get('type') || '');
+    const smart = getComponentDefinition(type)?.smartSection;
+    if (!smart) return;
+    const card = document.createElement('section');
+    card.className = 'smart-inspector';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'Smart section';
+    const title = document.createElement('strong');
+    title.textContent = getComponentDefinition(type)?.displayName ?? 'Smart section';
+    const purpose = document.createElement('p');
+    purpose.className = 'panel-note';
+    purpose.textContent = smart.purpose;
+    const variantLabel = document.createElement('label');
+    variantLabel.className = 'field dynamic-field';
+    variantLabel.textContent = 'Layout variant';
+    const variant = document.createElement('select');
+    smart.variants.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      option.selected = attributes['data-wk-variant'] === name;
+      variant.append(option);
+    });
+    variantLabel.append(variant);
+    variant.addEventListener('change', () => {
+      this.selected?.addAttributes({ 'data-wk-variant': variant.value });
+      this.scheduleSave();
+      this.toast('Smart section updated', `${variant.value} layout variant applied.`);
+    });
+    const checklist = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'Content checklist';
+    checklist.append(summary);
+    const list = document.createElement('ul');
+    smart.requiredContent.forEach((item) => {
+      const entry = document.createElement('li');
+      entry.textContent = item;
+      list.append(entry);
+    });
+    checklist.append(list);
+    card.append(eyebrow, title, purpose, variantLabel, checklist);
+    if (smart.dataSource) {
+      const source = document.createElement('small');
+      source.textContent = `Data source: ${smart.dataSource}`;
+      card.append(source);
+    }
+    host.append(card);
   }
 
   private renderContentControls(host: HTMLElement): void {
