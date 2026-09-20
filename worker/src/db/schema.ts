@@ -183,6 +183,93 @@ export const cmsRecord = sqliteTable(
     workspaceLookup: index('cms_record_workspace_lookup').on(table.workspaceId),
   }),
 );
+
+export const formDefinition = sqliteTable(
+  'form_definition',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    fields: text('fields').notNull().default('[]'),
+    settings: text('settings').notNull().default('{}'),
+    status: text('status').notNull().default('active'),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    siteSlugUnique: uniqueIndex('form_site_slug_unique').on(table.siteId, table.slug),
+    workspaceLookup: index('form_workspace_lookup').on(table.workspaceId),
+  }),
+);
+
+export const formSubmission = sqliteTable(
+  'form_submission',
+  {
+    id: text('id').primaryKey(),
+    formId: text('form_id').notNull(),
+    siteId: text('site_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    data: text('data').notNull().default('{}'),
+    status: text('status').notNull().default('received'),
+    idempotencyKey: text('idempotency_key'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    formLookup: index('form_submission_form_lookup').on(table.formId, table.createdAt),
+    workspaceLookup: index('form_submission_workspace_lookup').on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    idempotencyUnique: uniqueIndex('form_submission_idempotency_unique').on(
+      table.formId,
+      table.idempotencyKey,
+    ),
+  }),
+);
+
+export const automation = sqliteTable(
+  'automation',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    name: text('name').notNull(),
+    triggerType: text('trigger_type').notNull(),
+    graph: text('graph').notNull().default('{"conditions":[],"actions":[]}'),
+    status: text('status').notNull().default('draft'),
+    retryPolicy: text('retry_policy').notNull().default('{"maxAttempts":3,"backoffSeconds":10}'),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => ({ workspaceLookup: index('automation_workspace_lookup').on(table.workspaceId) }),
+);
+
+export const automationExecution = sqliteTable(
+  'automation_execution',
+  {
+    id: text('id').primaryKey(),
+    automationId: text('automation_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    eventId: text('event_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    status: text('status').notNull().default('running'),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    idempotencyUnique: uniqueIndex('automation_execution_idempotency_unique').on(
+      table.automationId,
+      table.idempotencyKey,
+    ),
+    workspaceLookup: index('automation_execution_workspace_lookup').on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+  }),
+);
 export const auditEvent = sqliteTable(
   'audit_event',
   {

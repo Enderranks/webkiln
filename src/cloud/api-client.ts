@@ -13,6 +13,10 @@ import type {
   CmsCollection,
   CmsRecord,
   CmsRecordPage,
+  FormDefinition,
+  FormSubmission,
+  Automation,
+  AutomationExecution,
 } from './contracts';
 
 export class CloudApiError extends Error {
@@ -179,6 +183,39 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
       headers: { 'Content-Type': 'text/csv' },
       body: csv,
     });
+  }
+  listForms(siteId: string): Promise<FormDefinition[]> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/forms`);
+  }
+  createForm(siteId: string, name: string, fields: unknown[]): Promise<FormDefinition> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/forms`, {
+      method: 'POST',
+      body: JSON.stringify({ name, fields }),
+    });
+  }
+  listSubmissions(formId: string): Promise<FormSubmission[]> {
+    return this.request(`/api/forms/${encodeURIComponent(formId)}/submissions`);
+  }
+  listAutomations(workspaceId: string): Promise<Automation[]> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/automations`);
+  }
+  createAutomation(
+    workspaceId: string,
+    input: { name: string; triggerType: string; graph: unknown },
+  ): Promise<Automation> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/automations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  updateAutomation(automationId: string, update: Record<string, unknown>): Promise<Automation> {
+    return this.request(`/api/automations/${encodeURIComponent(automationId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    });
+  }
+  listAutomationExecutions(automationId: string): Promise<AutomationExecution[]> {
+    return this.request(`/api/automations/${encodeURIComponent(automationId)}/executions`);
   }
   getProject(siteId: string): Promise<SiteProject> {
     return this.request(`/api/sites/${encodeURIComponent(siteId)}/project`);

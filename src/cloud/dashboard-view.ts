@@ -15,6 +15,7 @@ const sections = [
   'overview',
   'websites',
   'collections',
+  'automations',
   'templates',
   'domains',
   'forms',
@@ -69,6 +70,8 @@ export async function renderDashboard(
     if (section === 'overview') renderOverview();
     else if (section === 'websites') renderWebsites();
     else if (section === 'collections') void renderCollections();
+    else if (section === 'automations') void renderAutomations();
+    else if (section === 'forms') void renderForms();
     else if (section === 'templates') renderTemplates();
     else renderUnavailable(section);
   };
@@ -153,6 +156,89 @@ export async function renderDashboard(
       );
     } catch (error) {
       view.innerHTML = errorState(error, 'collections');
+    }
+  };
+  const renderAutomations = async () => {
+    view.innerHTML = loading('Loading automations');
+    try {
+      const automations = await cloud.listAutomations(selectedWorkspaceId);
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Automations</p><h1>Visual automations</h1><p>Connect a trigger to conditions and actions without exposing credentials to the browser.</p></div><button class="primary-btn" data-create-automation>New automation</button></div><div class="automation-list">${automations.map((flow) => `<article class="dashboard-panel automation-card"><div class="automation-flow"><span class="flow-node">${esc(flow.triggerType)}</span><b>→</b><span class="flow-node">${flow.graph.conditions.length} conditions</span><b>→</b><span class="flow-node">${flow.graph.actions.length} actions</span></div><div class="automation-card-footer"><div><h2>${esc(flow.name)}</h2><small>${flow.status} · retry up to ${flow.retryPolicy.maxAttempts} times</small></div><button class="ghost-btn" data-toggle-automation="${flow.id}" data-status="${flow.status}">${flow.status === 'enabled' ? 'Disable' : 'Enable'}</button></div></article>`).join('') || empty('No automations yet', 'Create a draft flow with a trigger, conditions, and actions.')}</div>`;
+      document.querySelector('[data-create-automation]')?.addEventListener('click', async () => {
+        const name = window.prompt('Automation name');
+        if (!name?.trim()) return;
+        try {
+          await cloud.createAutomation(selectedWorkspaceId, {
+            name: name.trim(),
+            triggerType: 'form.submitted',
+            graph: { conditions: [], actions: [{ type: 'log-event', config: {} }] },
+          });
+          say('Draft automation created.');
+          await renderAutomations();
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not create automation.');
+        }
+      });
+      document.querySelectorAll<HTMLButtonElement>('[data-toggle-automation]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          try {
+            const enabled = button.dataset.status !== 'enabled';
+            await cloud.updateAutomation(button.dataset.toggleAutomation ?? '', {
+              status: enabled ? 'enabled' : 'disabled',
+            });
+            say(enabled ? 'Automation enabled.' : 'Automation disabled.');
+            await renderAutomations();
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not update automation.');
+          }
+        }),
+      );
+    } catch (error) {
+      view.innerHTML = errorState(error, 'automations');
+    }
+  };
+  const renderForms = async () => {
+    view.innerHTML = loading('Loading forms');
+    try {
+      const forms = (
+        await Promise.all(
+          sites.map((site) =>
+            cloud
+              .listForms(site.id)
+              .then((items) => items.map((form) => ({ ...form, siteName: site.name }))),
+          ),
+        )
+      ).flat();
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Forms</p><h1>Production-ready forms</h1><p>Build accessible, validated forms with server-side storage. File uploads are intentionally unavailable.</p></div><button class="primary-btn" data-create-form ${sites[0] ? '' : 'disabled'}>New form</button></div><div class="website-grid">${forms.map((form) => `<article class="dashboard-panel collection-card"><div class="collection-mark">⌁</div><h2>${esc(form.name)}</h2><p class="website-url">${esc(form.siteName)} · /forms/${esc(form.slug)}</p><div class="website-meta"><span>${form.fields.length} fields</span><span>${form.settings.honeypot === false ? 'Honeypot off' : 'Honeypot on'}</span></div><div class="website-actions"><button class="primary-btn" data-submissions-form="${form.id}">View submissions</button></div></article>`).join('') || empty('No forms yet', 'Create a form with server-side validation and D1 submission storage.')}</div><div data-form-submissions></div>`;
+      document.querySelector('[data-create-form]')?.addEventListener('click', async () => {
+        const name = window.prompt('Form name');
+        if (!name?.trim() || !sites[0]) return;
+        try {
+          await cloud.createForm(sites[0].id, name.trim(), [
+            { name: 'name', type: 'text', label: 'Name', required: true },
+            { name: 'email', type: 'email', label: 'Email', required: true },
+            { name: 'message', type: 'textarea', label: 'Message', required: true },
+            { name: 'consent', type: 'consent', label: 'I agree to be contacted', required: true },
+          ]);
+          say('Form created.');
+          await renderForms();
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not create form.');
+        }
+      });
+      document.querySelectorAll<HTMLButtonElement>('[data-submissions-form]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          const target = document.querySelector<HTMLElement>('[data-form-submissions]');
+          if (!target) return;
+          try {
+            const submissions = await cloud.listSubmissions(button.dataset.submissionsForm ?? '');
+            target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><h2>Submissions</h2><span>${submissions.length} stored · latest 100</span></div>${submissions.map((submission) => `<div class="record-row"><strong>${new Date(submission.createdAt).toLocaleString()}</strong><span class="status-chip published">${esc(submission.status)}</span><small>${esc(Object.keys(submission.data).join(', '))}</small></div>`).join('') || empty('No submissions', 'Submissions will appear after the published form receives data.')}</section>`;
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not load submissions.');
+          }
+        }),
+      );
+    } catch (error) {
+      view.innerHTML = errorState(error, 'forms');
     }
   };
   const renderUnavailable = (section: Section) => {
@@ -267,6 +353,7 @@ export async function renderDashboard(
       overview: '◌',
       websites: '◈',
       collections: '{}',
+      automations: '↯',
       templates: '✦',
       domains: '⌁',
       forms: '▤',

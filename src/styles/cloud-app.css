@@ -740,6 +740,48 @@
   border-radius: 50%;
   color: var(--cloud-gold);
 }
+.automation-list {
+  display: grid;
+  gap: 12px;
+  max-width: 850px;
+}
+.automation-card {
+  padding: 18px;
+}
+.automation-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.flow-node {
+  padding: 9px 12px;
+  border: 1px solid rgba(214, 173, 97, 0.45);
+  border-radius: 7px;
+  color: #ead49e;
+  background: rgba(214, 173, 97, 0.06);
+  font-size: 11px;
+}
+.automation-flow b {
+  color: var(--cloud-muted);
+}
+.automation-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cloud-line);
+}
+.automation-card h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.automation-card small {
+  color: var(--cloud-muted);
+  font-size: 11px;
+}
 .dashboard-empty {
   grid-column: 1/-1;
   padding: 55px 18px;

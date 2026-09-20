@@ -94,6 +94,73 @@ export interface CmsRecordPage {
   pageSize: number;
   total: number;
 }
+export type FormFieldType =
+  | 'text'
+  | 'email'
+  | 'phone'
+  | 'number'
+  | 'date'
+  | 'time'
+  | 'select'
+  | 'checkbox'
+  | 'radio'
+  | 'textarea'
+  | 'consent'
+  | 'hidden';
+export interface FormField {
+  id: string;
+  name: string;
+  type: FormFieldType;
+  label: string;
+  required: boolean;
+  options?: string[];
+  validation?: Record<string, unknown>;
+  conditional?: { field: string; equals: string };
+}
+export interface FormDefinition {
+  id: string;
+  siteId: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  fields: FormField[];
+  settings: {
+    successMessage?: string;
+    failureMessage?: string;
+    submissionLimit?: number;
+    honeypot?: boolean;
+  };
+  status: 'active' | 'archived';
+}
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  data: Record<string, unknown>;
+  status: string;
+  createdAt: string;
+}
+export interface AutomationGraph {
+  conditions: Array<{ field: string; operator: string; value?: string }>;
+  actions: Array<{ type: string; config: Record<string, unknown> }>;
+}
+export interface Automation {
+  id: string;
+  workspaceId: string;
+  name: string;
+  triggerType: string;
+  graph: AutomationGraph;
+  status: 'draft' | 'enabled' | 'disabled';
+  retryPolicy: { maxAttempts: number; backoffSeconds: number };
+}
+export interface AutomationExecution {
+  id: string;
+  automationId: string;
+  eventId: string;
+  status: string;
+  attempts: number;
+  error?: string | null;
+  createdAt: string;
+}
 export interface SiteProject {
   site: CloudSite;
   project: WebKilnProject;

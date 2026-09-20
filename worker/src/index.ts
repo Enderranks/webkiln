@@ -9,6 +9,10 @@ import {
   cmsCollection,
   cmsField,
   cmsRecord,
+  formDefinition,
+  formSubmission,
+  automation,
+  automationExecution,
   page,
   publishedRelease,
   publishedSite,
@@ -31,7 +35,7 @@ import type { WebKilnProject } from '../../src/types';
 const app = new Hono<{ Bindings: Env }>();
 const jsonError = (
   c: Context<{ Bindings: Env }>,
-  status: 400 | 401 | 403 | 404 | 409 | 413 | 500,
+  status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500,
   code: string,
   message: string,
 ) => c.json({ error: { code, message } }, status);
@@ -147,6 +151,162 @@ async function validateReferences(
     if (!target) return `Reference field "${field.name}" points to an unavailable record`;
   }
   return null;
+}
+const formFieldTypes = new Set([
+  'text',
+  'email',
+  'phone',
+  'number',
+  'date',
+  'time',
+  'select',
+  'checkbox',
+  'radio',
+  'textarea',
+  'consent',
+  'hidden',
+]);
+function validateFormPayload(
+  fields: Array<{
+    name?: string;
+    type?: string;
+    required?: boolean;
+    options?: string[];
+    validation?: Record<string, unknown>;
+  }>,
+  data: Record<string, unknown>,
+) {
+  for (const field of fields) {
+    const value = data[field.name ?? ''];
+    if (field.required && (value === undefined || value === null || value === ''))
+      return `${field.name} is required`;
+    if (value === undefined || value === null || value === '') continue;
+    if (
+      field.type === 'email' &&
+      (typeof value !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+    )
+      return `${field.name} must be a valid email`;
+    if (field.type === 'number' && typeof value !== 'number' && Number.isNaN(Number(value)))
+      return `${field.name} must be a number`;
+    if (['select', 'radio'].includes(field.type ?? '') && !field.options?.includes(String(value)))
+      return `${field.name} has an invalid option`;
+    if (field.type === 'consent' && value !== true && value !== 'true')
+      return `${field.name} must be accepted`;
+    const pattern = field.validation?.pattern;
+    if (
+      typeof pattern === 'string' &&
+      typeof value === 'string' &&
+      !new RegExp(pattern).test(value)
+    )
+      return `${field.name} has an invalid format`;
+  }
+  return null;
+}
+function formResponse(row: typeof formDefinition.$inferSelect) {
+  return { ...row, fields: jsonValue(row.fields, []), settings: jsonValue(row.settings, {}) };
+}
+function automationResponse(row: typeof automation.$inferSelect) {
+  return {
+    ...row,
+    graph: jsonValue(row.graph, { conditions: [], actions: [] }),
+    retryPolicy: jsonValue(row.retryPolicy, { maxAttempts: 3, backoffSeconds: 10 }),
+  };
+}
+async function runAutomations(
+  c: Context<{ Bindings: Env }>,
+  workspaceId: string,
+  triggerType: string,
+  eventId: string,
+  payload: Record<string, unknown>,
+) {
+  const db = getDb(c.env.DB);
+  const flows = await db
+    .select()
+    .from(automation)
+    .where(
+      and(
+        eq(automation.workspaceId, workspaceId),
+        eq(automation.triggerType, triggerType),
+        eq(automation.status, 'enabled'),
+      ),
+    )
+    .limit(50)
+    .all();
+  for (const flow of flows) {
+    const key = `${triggerType}:${eventId}`;
+    const existing = await db
+      .select()
+      .from(automationExecution)
+      .where(
+        and(
+          eq(automationExecution.automationId, flow.id),
+          eq(automationExecution.idempotencyKey, key),
+        ),
+      )
+      .get();
+    if (existing) continue;
+    const executionId = crypto.randomUUID();
+    const now = new Date();
+    await db.insert(automationExecution).values({
+      id: executionId,
+      automationId: flow.id,
+      workspaceId,
+      eventId,
+      idempotencyKey: key,
+      status: 'running',
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const graph = jsonValue(flow.graph, { conditions: [], actions: [] }) as {
+      conditions?: Array<{ field: string; operator: string; value?: string }>;
+      actions?: Array<{ type: string; config: Record<string, unknown> }>;
+    };
+    const conditionsPass = (graph.conditions ?? []).every((condition) => {
+      const actual = String(payload[condition.field] ?? '');
+      if (condition.operator === 'equals') return actual === String(condition.value ?? '');
+      if (condition.operator === 'contains') return actual.includes(String(condition.value ?? ''));
+      if (condition.operator === 'exists') return Boolean(actual);
+      return false;
+    });
+    if (!conditionsPass) {
+      await db
+        .update(automationExecution)
+        .set({ status: 'skipped', updatedAt: new Date() })
+        .where(eq(automationExecution.id, executionId));
+      continue;
+    }
+    const retry = jsonValue(flow.retryPolicy, { maxAttempts: 3 }) as { maxAttempts?: number };
+    let attempts = 0;
+    let error: string | null = null;
+    let succeeded = false;
+    while (!succeeded && attempts < Math.max(1, Math.min(3, retry.maxAttempts ?? 3))) {
+      attempts += 1;
+      try {
+        for (const action of graph.actions ?? []) {
+          if (action.type === 'email') throw new Error('Email provider not connected');
+          if (action.type === 'webhook') {
+            const url = String(action.config.url ?? '');
+            if (!/^https:\/\//i.test(url))
+              throw new Error('Approved webhook requires an https URL');
+            await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-WebKiln-Event': triggerType },
+              body: JSON.stringify(payload),
+              signal: AbortSignal.timeout(5000),
+            });
+          }
+        }
+        succeeded = true;
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : 'Automation action failed';
+      }
+    }
+    await db
+      .update(automationExecution)
+      .set({ status: succeeded ? 'succeeded' : 'failed', attempts, error, updatedAt: new Date() })
+      .where(eq(automationExecution.id, executionId));
+  }
 }
 
 app.use('/api/auth/*', async (c, next) => {
@@ -328,6 +488,355 @@ app.post('/api/workspaces/:workspaceId/collections', async (c) => {
   const collection = await db.select().from(cmsCollection).where(eq(cmsCollection.id, id)).get();
   const createdFields = await db.select().from(cmsField).where(eq(cmsField.collectionId, id)).all();
   return c.json(serializeCollection(collection!, createdFields), 201);
+});
+
+app.get('/api/sites/:siteId/forms', async (c) => {
+  const record = await getSiteAccess(c, 'viewer');
+  if ('error' in record) return record.response;
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(formDefinition)
+    .where(eq(formDefinition.siteId, record.site.id))
+    .orderBy(asc(formDefinition.name))
+    .all();
+  return c.json(rows.map(formResponse));
+});
+
+app.post('/api/sites/:siteId/forms', async (c) => {
+  const record = await getSiteAccess(c, 'editor');
+  if ('error' in record) return record.response;
+  const body = await c.req.json<{
+    name?: string;
+    fields?: Array<{
+      id?: string;
+      name?: string;
+      type?: string;
+      label?: string;
+      required?: boolean;
+      options?: string[];
+      validation?: Record<string, unknown>;
+      conditional?: { field: string; equals: string };
+    }>;
+    settings?: Record<string, unknown>;
+  }>();
+  const name = body.name?.trim();
+  const fields = body.fields ?? [];
+  if (
+    !name ||
+    fields.length > 100 ||
+    fields.some((field) => !field.name || !formFieldTypes.has(field.type ?? ''))
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'A form name and supported fields are required');
+  const ids = fields.map((field) => field.name!);
+  if (new Set(ids).size !== ids.length)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field names must be unique');
+  const id = crypto.randomUUID();
+  const now = new Date();
+  const slug = `${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')}-${id.slice(0, 6)}`;
+  await getDb(c.env.DB)
+    .insert(formDefinition)
+    .values({
+      id,
+      siteId: record.site.id,
+      workspaceId: record.site.workspaceId,
+      name,
+      slug,
+      fields: JSON.stringify(
+        fields.map((field) => ({
+          id: field.id ?? crypto.randomUUID(),
+          name: field.name,
+          type: field.type,
+          label: field.label ?? field.name,
+          required: Boolean(field.required),
+          options: field.options ?? [],
+          validation: field.validation ?? {},
+          conditional: field.conditional,
+        })),
+      ),
+      settings: JSON.stringify({
+        honeypot: true,
+        successMessage: 'Thanks — your message has been received.',
+        failureMessage: 'We could not save your submission.',
+        submissionLimit: 100,
+        ...(body.settings ?? {}),
+      }),
+      createdBy: record.user.id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  return c.json(
+    formResponse(
+      (await getDb(c.env.DB).select().from(formDefinition).where(eq(formDefinition.id, id)).get())!,
+    ),
+    201,
+  );
+});
+
+app.get('/api/forms/:formId/submissions', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, membership: workspaceMembership })
+    .from(formDefinition)
+    .innerJoin(workspaceMembership, eq(formDefinition.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(formDefinition.id, c.req.param('formId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Form not found');
+  if (!['owner', 'admin', 'editor', 'viewer'].includes(row.membership.role))
+    return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
+  const submissions = await getDb(c.env.DB)
+    .select()
+    .from(formSubmission)
+    .where(eq(formSubmission.formId, row.form.id))
+    .orderBy(desc(formSubmission.createdAt))
+    .limit(100)
+    .all();
+  return c.json(
+    submissions.map((submission) => ({ ...submission, data: jsonValue(submission.data, {}) })),
+  );
+});
+
+app.post('/api/forms/:formId/submit', async (c) => {
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, site })
+    .from(formDefinition)
+    .innerJoin(site, eq(formDefinition.siteId, site.id))
+    .where(eq(formDefinition.id, c.req.param('formId')))
+    .get();
+  if (!row || row.form.status !== 'active') return jsonError(c, 404, 'NOT_FOUND', 'Form not found');
+  const published = await getDb(c.env.DB)
+    .select()
+    .from(publishedSite)
+    .where(eq(publishedSite.siteId, row.site.id))
+    .get();
+  if (!published?.currentReleaseId) return jsonError(c, 404, 'NOT_FOUND', 'Form is not available');
+  const body = await c.req.json<Record<string, unknown>>();
+  const settings = jsonValue(row.form.settings, {}) as {
+    honeypot?: boolean;
+    submissionLimit?: number;
+    successMessage?: string;
+    failureMessage?: string;
+  };
+  if (settings.honeypot !== false && body._website)
+    return c.json({ ok: true, message: settings.successMessage ?? 'Thanks.' });
+  const fields = jsonValue(row.form.fields, []) as Array<{
+    name?: string;
+    type?: string;
+    required?: boolean;
+    options?: string[];
+    validation?: Record<string, unknown>;
+  }>;
+  const validation = validateFormPayload(fields, body);
+  if (validation) return jsonError(c, 400, 'VALIDATION_ERROR', validation);
+  const idempotencyKey = c.req.header('Idempotency-Key') ?? null;
+  const db = getDb(c.env.DB);
+  if (idempotencyKey) {
+    const previous = await db
+      .select()
+      .from(formSubmission)
+      .where(
+        and(
+          eq(formSubmission.formId, row.form.id),
+          eq(formSubmission.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .get();
+    if (previous) return c.json({ ok: true, submissionId: previous.id, duplicate: true });
+  }
+  const recent = await db
+    .select()
+    .from(formSubmission)
+    .where(eq(formSubmission.formId, row.form.id))
+    .orderBy(desc(formSubmission.createdAt))
+    .limit(Math.min(100, Number(settings.submissionLimit ?? 100)))
+    .all();
+  if (
+    recent.length >= Number(settings.submissionLimit ?? 100) &&
+    recent[recent.length - 1] &&
+    Date.now() - recent[recent.length - 1].createdAt.getTime() < 86400000
+  )
+    return jsonError(c, 429, 'RATE_LIMITED', 'Submission limit reached');
+  const id = crypto.randomUUID();
+  const now = new Date();
+  await db.insert(formSubmission).values({
+    id,
+    formId: row.form.id,
+    siteId: row.site.id,
+    workspaceId: row.site.workspaceId,
+    data: JSON.stringify(body),
+    status: 'received',
+    idempotencyKey,
+    createdAt: now,
+  });
+  await runAutomations(c, row.site.workspaceId, 'form.submitted', id, {
+    formId: row.form.id,
+    submissionId: id,
+    data: body,
+  });
+  return c.json(
+    {
+      ok: true,
+      submissionId: id,
+      message: settings.successMessage ?? 'Thanks — your submission has been received.',
+    },
+    201,
+  );
+});
+
+app.get('/api/workspaces/:workspaceId/automations', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'admin',
+    'editor',
+    'viewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      access.error === 'UNAUTHENTICATED' ? 'Sign in required' : 'Forbidden',
+    );
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(automation)
+    .where(eq(automation.workspaceId, c.req.param('workspaceId')))
+    .orderBy(desc(automation.updatedAt))
+    .all();
+  return c.json(rows.map(automationResponse));
+});
+app.post('/api/workspaces/:workspaceId/automations', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'admin',
+    'editor',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      access.error === 'UNAUTHENTICATED' ? 'Sign in required' : 'Forbidden',
+    );
+  const body = await c.req.json<{
+    name?: string;
+    triggerType?: string;
+    graph?: { conditions?: unknown[]; actions?: unknown[] };
+  }>();
+  const allowed = [
+    'form.submitted',
+    'site.published',
+    'site.unpublished',
+    'collection.record.created',
+    'collection.record.updated',
+  ];
+  if (!body.name?.trim() || !body.triggerType || !allowed.includes(body.triggerType))
+    return jsonError(
+      c,
+      400,
+      'VALIDATION_ERROR',
+      'Automation name and supported trigger are required',
+    );
+  const id = crypto.randomUUID();
+  const now = new Date();
+  await getDb(c.env.DB)
+    .insert(automation)
+    .values({
+      id,
+      workspaceId: c.req.param('workspaceId'),
+      name: body.name.trim(),
+      triggerType: body.triggerType,
+      graph: JSON.stringify({
+        conditions: body.graph?.conditions ?? [],
+        actions: body.graph?.actions ?? [],
+      }),
+      status: 'draft',
+      createdBy: access.user.id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  return c.json(
+    automationResponse(
+      (await getDb(c.env.DB).select().from(automation).where(eq(automation.id, id)).get())!,
+    ),
+    201,
+  );
+});
+app.patch('/api/automations/:automationId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ flow: automation, membership: workspaceMembership })
+    .from(automation)
+    .innerJoin(workspaceMembership, eq(automation.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(automation.id, c.req.param('automationId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Automation not found');
+  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  const body = await c.req.json<{
+    name?: string;
+    status?: 'draft' | 'enabled' | 'disabled';
+    graph?: unknown;
+    retryPolicy?: unknown;
+  }>();
+  if (
+    body.status === 'enabled' &&
+    row.flow.triggerType === 'form.submitted' &&
+    !body.graph &&
+    !row.flow.graph
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'An automation graph is required');
+  await getDb(c.env.DB)
+    .update(automation)
+    .set({
+      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      ...(body.status ? { status: body.status } : {}),
+      ...(body.graph ? { graph: JSON.stringify(body.graph) } : {}),
+      ...(body.retryPolicy ? { retryPolicy: JSON.stringify(body.retryPolicy) } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(automation.id, row.flow.id));
+  return c.json(
+    automationResponse(
+      (await getDb(c.env.DB)
+        .select()
+        .from(automation)
+        .where(eq(automation.id, row.flow.id))
+        .get())!,
+    ),
+  );
+});
+app.get('/api/automations/:automationId/executions', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ flow: automation, membership: workspaceMembership })
+    .from(automation)
+    .innerJoin(workspaceMembership, eq(automation.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(automation.id, c.req.param('automationId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Automation not found');
+  if (!['owner', 'admin', 'editor', 'viewer'].includes(row.membership.role))
+    return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
+  return c.json(
+    await getDb(c.env.DB)
+      .select()
+      .from(automationExecution)
+      .where(eq(automationExecution.automationId, row.flow.id))
+      .orderBy(desc(automationExecution.createdAt))
+      .limit(100)
+      .all(),
+  );
 });
 
 app.get('/api/collections/:collectionId/records', async (c) => {
@@ -1205,6 +1714,10 @@ app.post('/api/sites/:siteId/publish', async (c) => {
       createdAt: now,
     }),
   ]);
+  await runAutomations(c, record.site.workspaceId, 'site.published', release.id, {
+    siteId: record.site.id,
+    releaseId: release.id,
+  });
   return c.json(
     {
       published: true,
@@ -1226,6 +1739,9 @@ app.post('/api/sites/:siteId/unpublish', async (c) => {
     .update(publishedSite)
     .set({ currentReleaseId: null, publishedAt: null, passwordHash: null, updatedAt: now })
     .where(eq(publishedSite.siteId, record.site.id));
+  await runAutomations(c, record.site.workspaceId, 'site.unpublished', record.site.id, {
+    siteId: record.site.id,
+  });
   return c.json({ published: false });
 });
 
