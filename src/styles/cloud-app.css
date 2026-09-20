@@ -757,6 +757,37 @@
 .dashboard-topbar .account-menu {
   margin-left: 12px;
 }
+.collection-card {
+  min-height: 210px;
+}
+.collection-card h2 {
+  margin: 12px 0 4px;
+}
+.collection-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--cloud-gold);
+  border-radius: 8px;
+  color: var(--cloud-gold);
+  font: 600 16px 'Space Grotesk';
+}
+.collection-records {
+  margin-top: 18px;
+}
+.record-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--cloud-line);
+  font-size: 11px;
+}
+.record-row small {
+  color: var(--cloud-muted);
+}
 .revision-row {
   padding: 8px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);

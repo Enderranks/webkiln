@@ -6,6 +6,9 @@ import { getAuth } from './auth';
 import { getDb } from './db/client';
 import {
   auditEvent,
+  cmsCollection,
+  cmsField,
+  cmsRecord,
   page,
   publishedRelease,
   publishedSite,
@@ -32,6 +35,119 @@ const jsonError = (
   code: string,
   message: string,
 ) => c.json({ error: { code, message } }, status);
+const cmsFieldTypes = new Set([
+  'text',
+  'rich-text',
+  'number',
+  'boolean',
+  'date',
+  'url',
+  'image',
+  'select',
+  'multi-select',
+  'reference',
+  'slug',
+]);
+const safeRichText = (value: unknown) =>
+  typeof value === 'string'
+    ? value
+        .replace(/<((script|iframe|object|embed|style|form|link|meta))[^>]*>[\s\S]*?<\/\1>/gi, '')
+        .replace(/<\/?(script|iframe|object|embed|style|form|link|meta)[^>]*>/gi, '')
+        .replace(/\s(on\w+|javascript:)\s*=\s*(['"]).*?\2/gi, '')
+    : value;
+const jsonValue = (value: string | null | undefined, fallback: unknown) => {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+async function cmsAccess(
+  c: Context<{ Bindings: Env }>,
+  collectionId: string,
+  role: 'viewer' | 'editor',
+) {
+  const user = await currentUser(c);
+  if (!user)
+    return { error: true, response: jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required') };
+  const item = await getDb(c.env.DB)
+    .select({ collection: cmsCollection, membership: workspaceMembership })
+    .from(cmsCollection)
+    .innerJoin(workspaceMembership, eq(cmsCollection.workspaceId, workspaceMembership.workspaceId))
+    .where(and(eq(cmsCollection.id, collectionId), eq(workspaceMembership.userId, user.id)))
+    .get();
+  if (!item)
+    return { error: true, response: jsonError(c, 404, 'NOT_FOUND', 'Collection not found') };
+  if (role === 'editor' && !['owner', 'admin', 'editor'].includes(item.membership.role))
+    return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
+  return { ...item, user };
+}
+function serializeCollection(
+  item: typeof cmsCollection.$inferSelect,
+  fields: (typeof cmsField.$inferSelect)[],
+) {
+  return {
+    ...item,
+    permissions: jsonValue(item.permissions, { read: 'published', write: 'editor' }),
+    fields: fields
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((field) => ({
+        ...field,
+        unique: field.isUnique,
+        validation: jsonValue(field.validation, {}),
+        options: jsonValue(field.options, []),
+      })),
+  };
+}
+function validateRecord(fields: (typeof cmsField.$inferSelect)[], data: Record<string, unknown>) {
+  for (const field of fields) {
+    const value =
+      data[field.slug] ??
+      (field.defaultValue ? jsonValue(field.defaultValue, field.defaultValue) : undefined);
+    if (field.required && (value === undefined || value === null || value === ''))
+      return `Field "${field.name}" is required`;
+    if (value === undefined || value === null || value === '') continue;
+    if (field.type === 'number' && typeof value !== 'number')
+      return `Field "${field.name}" must be a number`;
+    if (field.type === 'boolean' && typeof value !== 'boolean')
+      return `Field "${field.name}" must be boolean`;
+    if (field.type === 'url' && (typeof value !== 'string' || !/^https?:\/\//i.test(value)))
+      return `Field "${field.name}" must be an http(s) URL`;
+    if (field.type === 'reference' && typeof value !== 'string')
+      return `Field "${field.name}" must reference a record id`;
+    if (field.type === 'rich-text') data[field.slug] = safeRichText(value);
+  }
+  return null;
+}
+async function validateReferences(
+  db: ReturnType<typeof getDb>,
+  fields: (typeof cmsField.$inferSelect)[],
+  data: Record<string, unknown>,
+  workspaceId: string,
+) {
+  for (const field of fields.filter(
+    (item) => item.type === 'reference' && item.referenceCollectionId,
+  )) {
+    const value = data[field.slug];
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string')
+      return `Reference field "${field.name}" must contain a record id`;
+    const target = await db
+      .select()
+      .from(cmsRecord)
+      .where(
+        and(
+          eq(cmsRecord.id, value),
+          eq(cmsRecord.workspaceId, workspaceId),
+          eq(cmsRecord.collectionId, field.referenceCollectionId!),
+        ),
+      )
+      .get();
+    if (!target) return `Reference field "${field.name}" points to an unavailable record`;
+  }
+  return null;
+}
 
 app.use('/api/auth/*', async (c, next) => {
   const response = await cors({
@@ -86,6 +202,366 @@ app.post('/api/workspaces', async (c) => {
     }),
   ]);
   return c.json({ id, name, slug, ownerUserId: user.id, role: 'owner' }, 201);
+});
+
+app.get('/api/workspaces/:workspaceId/collections', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'admin',
+    'editor',
+    'viewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      access.error === 'UNAUTHENTICATED' ? 'Sign in required' : 'Forbidden',
+    );
+  const db = getDb(c.env.DB);
+  const collections = await db
+    .select()
+    .from(cmsCollection)
+    .where(eq(cmsCollection.workspaceId, c.req.param('workspaceId')))
+    .orderBy(asc(cmsCollection.name))
+    .all();
+  const fields = await db.select().from(cmsField).all();
+  return c.json(
+    collections.map((item) =>
+      serializeCollection(
+        item,
+        fields.filter((field) => field.collectionId === item.id),
+      ),
+    ),
+  );
+});
+
+app.post('/api/workspaces/:workspaceId/collections', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'admin',
+    'editor',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      access.error === 'UNAUTHENTICATED' ? 'Sign in required' : 'Forbidden',
+    );
+  const body = await c.req.json<{
+    name?: string;
+    fields?: Array<{
+      name?: string;
+      slug?: string;
+      type?: string;
+      required?: boolean;
+      unique?: boolean;
+      defaultValue?: unknown;
+      validation?: Record<string, unknown>;
+      options?: string[];
+      referenceCollectionId?: string;
+    }>;
+  }>();
+  const name = body.name?.trim();
+  if (!name || !Array.isArray(body.fields) || body.fields.length > 50)
+    return jsonError(
+      c,
+      400,
+      'VALIDATION_ERROR',
+      'Collection name and up to 50 fields are required',
+    );
+  const fields = body.fields.map((field, index) => ({
+    ...field,
+    name: field.name?.trim(),
+    slug:
+      field.slug?.trim() ||
+      field.name
+        ?.trim()
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+    type: field.type ?? 'text',
+    index,
+  }));
+  if (fields.some((field) => !field.name || !field.slug || !cmsFieldTypes.has(field.type ?? '')))
+    return jsonError(
+      c,
+      400,
+      'VALIDATION_ERROR',
+      'Every field needs a name, slug, and supported type',
+    );
+  if (new Set(fields.map((field) => field.slug)).size !== fields.length)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Field slugs must be unique');
+  const id = crypto.randomUUID();
+  const now = new Date();
+  const slug = `${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')}-${id.slice(0, 6)}`;
+  const db = getDb(c.env.DB);
+  await db.insert(cmsCollection).values({
+    id,
+    workspaceId: c.req.param('workspaceId'),
+    name,
+    slug,
+    createdBy: access.user.id,
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const field of fields)
+    await db.insert(cmsField).values({
+      id: crypto.randomUUID(),
+      collectionId: id,
+      name: field.name!,
+      slug: field.slug!,
+      type: field.type!,
+      required: Boolean(field.required),
+      isUnique: Boolean(field.unique),
+      defaultValue: field.defaultValue === undefined ? null : JSON.stringify(field.defaultValue),
+      validation: JSON.stringify(field.validation ?? {}),
+      options: JSON.stringify(field.options ?? []),
+      referenceCollectionId: field.referenceCollectionId ?? null,
+      sortOrder: field.index,
+      createdAt: now,
+      updatedAt: now,
+    });
+  const collection = await db.select().from(cmsCollection).where(eq(cmsCollection.id, id)).get();
+  const createdFields = await db.select().from(cmsField).where(eq(cmsField.collectionId, id)).all();
+  return c.json(serializeCollection(collection!, createdFields), 201);
+});
+
+app.get('/api/collections/:collectionId/records', async (c) => {
+  const access = await cmsAccess(c, c.req.param('collectionId'), 'viewer');
+  if ('error' in access) return access.response;
+  const pageNumber = Math.max(1, Math.min(10000, Number(c.req.query('page') ?? '1') || 1));
+  const pageSize = Math.max(1, Math.min(100, Number(c.req.query('pageSize') ?? '25') || 25));
+  const status =
+    c.req.query('status') === 'published'
+      ? 'published'
+      : c.req.query('status') === 'draft'
+        ? 'draft'
+        : undefined;
+  const search = c.req.query('search')?.trim().toLowerCase();
+  const fields = await getDb(c.env.DB)
+    .select()
+    .from(cmsField)
+    .where(eq(cmsField.collectionId, access.collection.id))
+    .all();
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(cmsRecord)
+    .where(
+      and(
+        eq(cmsRecord.collectionId, access.collection.id),
+        ...(status ? [eq(cmsRecord.status, status)] : []),
+      ),
+    )
+    .orderBy(desc(cmsRecord.updatedAt))
+    .limit(1000)
+    .all();
+  const filtered = rows.filter(
+    (row) =>
+      !search ||
+      row.slug.toLowerCase().includes(search) ||
+      JSON.stringify(row.data).toLowerCase().includes(search),
+  );
+  const records = filtered
+    .slice((pageNumber - 1) * pageSize, pageNumber * pageSize)
+    .map((row) => ({ ...row, data: jsonValue(row.data, {}) }));
+  void fields;
+  return c.json({ records, page: pageNumber, pageSize, total: filtered.length });
+});
+
+app.post('/api/collections/:collectionId/records', async (c) => {
+  const access = await cmsAccess(c, c.req.param('collectionId'), 'editor');
+  if ('error' in access) return access.response;
+  const body = await c.req.json<{
+    data?: Record<string, unknown>;
+    status?: 'draft' | 'published';
+    slug?: string;
+  }>();
+  const fields = await getDb(c.env.DB)
+    .select()
+    .from(cmsField)
+    .where(eq(cmsField.collectionId, access.collection.id))
+    .all();
+  const data = { ...(body.data ?? {}) };
+  const validation = validateRecord(fields, data);
+  if (validation) return jsonError(c, 400, 'VALIDATION_ERROR', validation);
+  const referenceError = await validateReferences(
+    getDb(c.env.DB),
+    fields,
+    data,
+    access.collection.workspaceId,
+  );
+  if (referenceError) return jsonError(c, 400, 'VALIDATION_ERROR', referenceError);
+  const id = crypto.randomUUID();
+  const now = new Date();
+  const slug = body.slug?.trim() || String(data.slug ?? id.slice(0, 8));
+  if (body.status === 'published' && validation)
+    return jsonError(c, 400, 'VALIDATION_ERROR', validation);
+  await getDb(c.env.DB)
+    .insert(cmsRecord)
+    .values({
+      id,
+      collectionId: access.collection.id,
+      workspaceId: access.collection.workspaceId,
+      slug,
+      data: JSON.stringify(data),
+      status: body.status === 'published' ? 'published' : 'draft',
+      createdBy: access.user.id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  return c.json(
+    {
+      id,
+      collectionId: access.collection.id,
+      workspaceId: access.collection.workspaceId,
+      slug,
+      data,
+      status: body.status === 'published' ? 'published' : 'draft',
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    },
+    201,
+  );
+});
+
+app.patch('/api/records/:recordId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ record: cmsRecord, membership: workspaceMembership })
+    .from(cmsRecord)
+    .innerJoin(workspaceMembership, eq(cmsRecord.workspaceId, workspaceMembership.workspaceId))
+    .where(and(eq(cmsRecord.id, c.req.param('recordId')), eq(workspaceMembership.userId, user.id)))
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Record not found');
+  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  const body = await c.req.json<{
+    data?: Record<string, unknown>;
+    status?: 'draft' | 'published';
+  }>();
+  const fields = await getDb(c.env.DB)
+    .select()
+    .from(cmsField)
+    .where(eq(cmsField.collectionId, row.record.collectionId))
+    .all();
+  const data = body.data ?? jsonValue(row.record.data, {});
+  const validation = validateRecord(fields, data);
+  if (validation) return jsonError(c, 400, 'VALIDATION_ERROR', validation);
+  const referenceError = await validateReferences(
+    getDb(c.env.DB),
+    fields,
+    data,
+    row.record.workspaceId,
+  );
+  if (referenceError) return jsonError(c, 400, 'VALIDATION_ERROR', referenceError);
+  const now = new Date();
+  await getDb(c.env.DB)
+    .update(cmsRecord)
+    .set({
+      data: JSON.stringify(data),
+      status:
+        body.status === 'published'
+          ? 'published'
+          : body.status === 'draft'
+            ? 'draft'
+            : row.record.status,
+      updatedAt: now,
+    })
+    .where(eq(cmsRecord.id, row.record.id));
+  return c.json({
+    ...row.record,
+    data,
+    status: body.status ?? row.record.status,
+    updatedAt: now.toISOString(),
+  });
+});
+
+app.delete('/api/records/:recordId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ record: cmsRecord, membership: workspaceMembership })
+    .from(cmsRecord)
+    .innerJoin(workspaceMembership, eq(cmsRecord.workspaceId, workspaceMembership.workspaceId))
+    .where(and(eq(cmsRecord.id, c.req.param('recordId')), eq(workspaceMembership.userId, user.id)))
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Record not found');
+  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  await getDb(c.env.DB).delete(cmsRecord).where(eq(cmsRecord.id, row.record.id));
+  return c.body(null, 204);
+});
+
+app.get('/api/collections/:collectionId/export', async (c) => {
+  const access = await cmsAccess(c, c.req.param('collectionId'), 'viewer');
+  if ('error' in access) return access.response;
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(cmsRecord)
+    .where(eq(cmsRecord.collectionId, access.collection.id))
+    .limit(1000)
+    .all();
+  const csv = [
+    'id,slug,status,data',
+    ...rows.map((row) =>
+      [row.id, row.slug, row.status, JSON.stringify(row.data).replace(/"/g, '""')]
+        .map((value) => `"${value}"`)
+        .join(','),
+    ),
+  ].join('\n');
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${access.collection.slug}.csv"`,
+    },
+  });
+});
+
+app.post('/api/collections/:collectionId/import', async (c) => {
+  const access = await cmsAccess(c, c.req.param('collectionId'), 'editor');
+  if ('error' in access) return access.response;
+  const csv = await c.req.text();
+  const lines = csv.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2 || lines.length > 101)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'CSV must contain between 1 and 100 records');
+  const headers = lines[0].split(',').map((header) => header.trim().replace(/^"|"$/g, ''));
+  const fields = await getDb(c.env.DB)
+    .select()
+    .from(cmsField)
+    .where(eq(cmsField.collectionId, access.collection.id))
+    .all();
+  const now = new Date();
+  const created: unknown[] = [];
+  for (const line of lines.slice(1)) {
+    const values = line
+      .split(',')
+      .map((value) => value.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
+    const data = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+    const validation = validateRecord(fields, data);
+    if (validation) return jsonError(c, 400, 'VALIDATION_ERROR', validation);
+    const id = crypto.randomUUID();
+    const slug = String(data.slug || id.slice(0, 8));
+    await getDb(c.env.DB)
+      .insert(cmsRecord)
+      .values({
+        id,
+        collectionId: access.collection.id,
+        workspaceId: access.collection.workspaceId,
+        slug,
+        data: JSON.stringify(data),
+        status: 'draft',
+        createdBy: access.user.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    created.push({ id, slug });
+  }
+  return c.json({ imported: created.length, records: created }, 201);
 });
 
 app.get('/api/workspaces/:workspaceId', async (c) => {
@@ -881,16 +1357,65 @@ async function renderPublicPage(
   if (!published) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
   const foundPage = published.snapshot.pages.find((item) => item.slug === pageSlug);
   const page = foundPage ?? published.snapshot.custom404;
+  if (!page) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
   const hasAccess =
     !published.published.passwordHash ||
     (await validAccessToken(c, published.site.id, c.env.BETTER_AUTH_SECRET));
+  const resolvedPage = { ...page, html: await resolveDynamicHtml(c, page.html) };
   const html = publicHtml(
     published.snapshot,
-    page,
+    resolvedPage,
     publicSiteUrl(c, published.site.slug),
     Boolean(published.published.passwordHash) && !hasAccess,
   );
   return publicHtmlResponse(c, html, foundPage ? 200 : 404);
+}
+
+async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string): Promise<string> {
+  const bindingPattern =
+    /<([a-z][a-z0-9-]*)([^>]*data-wk-collection=["']([^"']+)["'][^>]*data-wk-field=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+  let output = source;
+  const matches = [...source.matchAll(bindingPattern)].slice(0, 50);
+  for (const match of matches) {
+    const [whole, tag, attributes, collectionId, field, fallbackContent] = match;
+    const repeat = /data-wk-repeat=["']true["']/i.test(attributes);
+    const fallback = attributes.match(/data-wk-fallback=["']([^"']*)["']/i)?.[1] ?? fallbackContent;
+    const emptyBehavior = attributes.match(/data-wk-empty=["']([^"']*)["']/i)?.[1] ?? 'hide';
+    const rows = await getDb(c.env.DB)
+      .select()
+      .from(cmsRecord)
+      .where(and(eq(cmsRecord.collectionId, collectionId), eq(cmsRecord.status, 'published')))
+      .limit(100)
+      .all();
+    const value = (row: typeof cmsRecord.$inferSelect) =>
+      escapePublicText(String(jsonValue(row.data, {})[field] ?? ''));
+    const content = rows.length
+      ? repeat
+        ? rows.map(value).join('')
+        : value(rows[0])
+      : emptyBehavior === 'fallback'
+        ? fallback
+        : emptyBehavior === 'empty'
+          ? ''
+          : null;
+    const replacement =
+      content === null ? '' : `<${tag}${stripBindingAttributes(attributes)}>${content}</${tag}>`;
+    output = output.replace(whole, replacement);
+  }
+  return output;
+}
+function stripBindingAttributes(attributes: string): string {
+  return attributes.replace(
+    /\s+data-wk-(?:collection|field|fallback|empty|repeat)=(?:"[^"]*"|'[^']*')/gi,
+    '',
+  );
+}
+function escapePublicText(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
+  );
 }
 
 async function getPublishedSite(c: Context<{ Bindings: Env }>, siteSlug: string) {

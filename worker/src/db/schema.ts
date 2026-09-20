@@ -121,6 +121,68 @@ export const assetMetadata = sqliteTable('asset_metadata', {
   createdBy: text('created_by').notNull(),
   ...timestamps,
 });
+
+export const cmsCollection = sqliteTable(
+  'cms_collection',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    permissions: text('permissions').notNull().default('{"read":"published","write":"editor"}'),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    slugUnique: uniqueIndex('cms_collection_workspace_slug').on(table.workspaceId, table.slug),
+    workspaceLookup: index('cms_collection_workspace_lookup').on(table.workspaceId),
+  }),
+);
+
+export const cmsField = sqliteTable(
+  'cms_field',
+  {
+    id: text('id').primaryKey(),
+    collectionId: text('collection_id').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    type: text('type').notNull(),
+    required: integer('required', { mode: 'boolean' }).notNull().default(false),
+    isUnique: integer('is_unique', { mode: 'boolean' }).notNull().default(false),
+    defaultValue: text('default_value'),
+    validation: text('validation').notNull().default('{}'),
+    options: text('options').notNull().default('[]'),
+    referenceCollectionId: text('reference_collection_id'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (table) => ({
+    fieldSlugUnique: uniqueIndex('cms_field_collection_slug').on(table.collectionId, table.slug),
+    collectionLookup: index('cms_field_collection_lookup').on(table.collectionId),
+  }),
+);
+
+export const cmsRecord = sqliteTable(
+  'cms_record',
+  {
+    id: text('id').primaryKey(),
+    collectionId: text('collection_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    slug: text('slug').notNull(),
+    data: text('data').notNull().default('{}'),
+    status: text('status').notNull().default('draft'),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    recordSlugUnique: uniqueIndex('cms_record_collection_slug').on(table.collectionId, table.slug),
+    collectionStatusLookup: index('cms_record_collection_status_lookup').on(
+      table.collectionId,
+      table.status,
+    ),
+    workspaceLookup: index('cms_record_workspace_lookup').on(table.workspaceId),
+  }),
+);
 export const auditEvent = sqliteTable(
   'audit_event',
   {

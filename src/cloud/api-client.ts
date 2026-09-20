@@ -10,6 +10,9 @@ import type {
   PublishStatus,
   SaveProjectRequest,
   Workspace,
+  CmsCollection,
+  CmsRecord,
+  CmsRecordPage,
 } from './contracts';
 
 export class CloudApiError extends Error {
@@ -121,6 +124,61 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
   }
   deleteSite(siteId: string): Promise<void> {
     return this.request(`/api/sites/${encodeURIComponent(siteId)}`, { method: 'DELETE' });
+  }
+  listCollections(workspaceId: string): Promise<CmsCollection[]> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/collections`);
+  }
+  createCollection(
+    workspaceId: string,
+    input: { name: string; fields: unknown[] },
+  ): Promise<CmsCollection> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/collections`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  listRecords(collectionId: string, query = ''): Promise<CmsRecordPage> {
+    return this.request(
+      `/api/collections/${encodeURIComponent(collectionId)}/records${query ? `?${query}` : ''}`,
+    );
+  }
+  createRecord(
+    collectionId: string,
+    data: Record<string, unknown>,
+    status: 'draft' | 'published' = 'draft',
+  ): Promise<CmsRecord> {
+    return this.request(`/api/collections/${encodeURIComponent(collectionId)}/records`, {
+      method: 'POST',
+      body: JSON.stringify({ data, status }),
+    });
+  }
+  updateRecord(
+    recordId: string,
+    data: Record<string, unknown>,
+    status?: 'draft' | 'published',
+  ): Promise<CmsRecord> {
+    return this.request(`/api/records/${encodeURIComponent(recordId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data, ...(status ? { status } : {}) }),
+    });
+  }
+  deleteRecord(recordId: string): Promise<void> {
+    return this.request(`/api/records/${encodeURIComponent(recordId)}`, { method: 'DELETE' });
+  }
+  exportCollection(collectionId: string): Promise<string> {
+    return fetch(`${this.baseUrl}/api/collections/${encodeURIComponent(collectionId)}/export`, {
+      credentials: 'include',
+    }).then((response) => {
+      if (!response.ok) throw new Error('Could not export collection');
+      return response.text();
+    });
+  }
+  importCollection(collectionId: string, csv: string): Promise<{ imported: number }> {
+    return this.request(`/api/collections/${encodeURIComponent(collectionId)}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/csv' },
+      body: csv,
+    });
   }
   getProject(siteId: string): Promise<SiteProject> {
     return this.request(`/api/sites/${encodeURIComponent(siteId)}/project`);

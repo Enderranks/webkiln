@@ -14,6 +14,7 @@ const esc = (value: string) =>
 const sections = [
   'overview',
   'websites',
+  'collections',
   'templates',
   'domains',
   'forms',
@@ -67,6 +68,7 @@ export async function renderDashboard(
       .forEach((button) => button.classList.toggle('active', button.dataset.nav === section));
     if (section === 'overview') renderOverview();
     else if (section === 'websites') renderWebsites();
+    else if (section === 'collections') void renderCollections();
     else if (section === 'templates') renderTemplates();
     else renderUnavailable(section);
   };
@@ -99,6 +101,59 @@ export async function renderDashboard(
           () => void create(button.dataset.template ?? 'Template website'),
         ),
       );
+  };
+  const renderCollections = async () => {
+    view.innerHTML = loading('Loading collections');
+    try {
+      const collections = await cloud.listCollections(selectedWorkspaceId);
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Collections</p><h1>Reusable content</h1><p>Keep structured content separate from layout, then bind it into any page.</p></div><button class="primary-btn" data-create-collection>New collection</button></div><div class="website-grid">${collections.map((collection) => `<article class="dashboard-panel collection-card"><div class="collection-mark">{ }</div><h2>${esc(collection.name)}</h2><p class="website-url">${esc(collection.slug)}</p><div class="website-meta"><span>${collection.fields.length} fields</span><span>${collection.permissions.read} read access</span></div><div class="website-actions"><button class="ghost-btn" data-export-collection="${collection.id}">Export CSV</button><button class="primary-btn" data-records-collection="${collection.id}">View records</button></div></article>`).join('') || empty('No collections yet', 'Create a collection for posts, products, people, or any structured content.')}</div><div data-collection-records></div>`;
+      document.querySelector('[data-create-collection]')?.addEventListener('click', async () => {
+        const name = window.prompt('Collection name');
+        if (!name?.trim()) return;
+        try {
+          await cloud.createCollection(selectedWorkspaceId, {
+            name: name.trim(),
+            fields: [
+              { name: 'Title', slug: 'title', type: 'text', required: true },
+              { name: 'Body', slug: 'body', type: 'rich-text' },
+              { name: 'Slug', slug: 'slug', type: 'slug', required: true, unique: true },
+            ],
+          });
+          say('Collection created.');
+          await renderCollections();
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not create collection.');
+        }
+      });
+      document.querySelectorAll<HTMLButtonElement>('[data-export-collection]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          try {
+            const csv = await cloud.exportCollection(button.dataset.exportCollection ?? '');
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            link.download = 'webkiln-collection.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Export failed.');
+          }
+        }),
+      );
+      document.querySelectorAll<HTMLButtonElement>('[data-records-collection]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          const target = document.querySelector<HTMLElement>('[data-collection-records]');
+          if (!target) return;
+          try {
+            const result = await cloud.listRecords(button.dataset.recordsCollection ?? '');
+            target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><h2>Records</h2><span>${result.total} total · page ${result.page}</span></div>${result.records.map((record) => `<div class="record-row"><strong>${esc(record.slug)}</strong><span class="status-chip ${record.status === 'published' ? 'published' : ''}">${record.status}</span><small>${new Date(record.updatedAt).toLocaleString()}</small></div>`).join('') || empty('No records', 'Add the first record through the collection API or binding workflow.')}</section>`;
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not load records.');
+          }
+        }),
+      );
+    } catch (error) {
+      view.innerHTML = errorState(error, 'collections');
+    }
   };
   const renderUnavailable = (section: Section) => {
     const details: Record<string, [string, string]> = {
@@ -211,6 +266,7 @@ export async function renderDashboard(
     ({
       overview: '◌',
       websites: '◈',
+      collections: '{}',
       templates: '✦',
       domains: '⌁',
       forms: '▤',

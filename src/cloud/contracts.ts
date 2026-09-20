@@ -42,6 +42,58 @@ export interface CloudSite {
   updatedBy: string;
   published?: boolean;
 }
+export type CmsFieldType =
+  | 'text'
+  | 'rich-text'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'url'
+  | 'image'
+  | 'select'
+  | 'multi-select'
+  | 'reference'
+  | 'slug';
+export interface CmsField {
+  id: string;
+  collectionId: string;
+  name: string;
+  slug: string;
+  type: CmsFieldType;
+  required: boolean;
+  unique: boolean;
+  defaultValue?: string | null;
+  validation: Record<string, unknown>;
+  options: string[];
+  referenceCollectionId?: string | null;
+  sortOrder: number;
+}
+export interface CmsCollection {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  permissions: { read: 'published' | 'workspace'; write: 'editor' | 'admin' };
+  fields: CmsField[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface CmsRecord {
+  id: string;
+  collectionId: string;
+  workspaceId: string;
+  slug: string;
+  data: Record<string, unknown>;
+  status: 'draft' | 'published';
+  createdAt: string;
+  updatedAt: string;
+}
+export interface CmsRecordPage {
+  records: CmsRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
 export interface SiteProject {
   site: CloudSite;
   project: WebKilnProject;

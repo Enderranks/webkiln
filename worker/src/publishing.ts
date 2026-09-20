@@ -30,6 +30,7 @@ export function sanitizeHtml(input: string): string {
     .replace(BLOCKED_TAGS, '')
     .replace(EVENT_ATTR, '')
     .replace(/\s+(?:data-gjs-[\w:-]+|gjs-[\w:-]+)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s+data-wk-[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/\s+(?:id|class)\s*=\s*(?:"[^"]*"|'[^']*')/gi, (attribute) =>
       /data-gjs-|gjs-|gjs-/i.test(attribute) ? '' : attribute,
     )

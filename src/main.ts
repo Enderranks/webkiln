@@ -12,6 +12,7 @@ import type { Session, SiteProject, SiteRevision } from './cloud/contracts';
 import { protectedRedirect } from './cloud/protected-route';
 import { EditingExperienceController } from './editor/editing-experience';
 import { DesignGuardianController } from './editor/design-guardian';
+import { DynamicBindingController } from './editor/dynamic-binding';
 
 const cloud = new WebKilnApiClient();
 const storage = new LocalProjectStorage();
@@ -84,6 +85,10 @@ async function bootEditor(siteId?: string, remote?: SiteProject, preview = false
     new DesignGuardianController(adapter, project, () =>
       editorController.markDirty('Design system'),
     ).start();
+    if (siteId && remote)
+      void new DynamicBindingController(adapter, cloud, remote.site.workspaceId, () =>
+        editorController.markDirty('Dynamic binding'),
+      ).start();
     if (preview) adapter.setPreview(true);
     renderAccountMenu(cloud);
     renderCloudStatus(cloud, siteId);
