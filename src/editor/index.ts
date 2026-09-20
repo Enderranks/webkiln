@@ -1,1 +1,1 @@
-export { GrapesJSEditorAdapter } from './grapesjs-adapter';
+export { WebKilnEditorAdapter } from './webkiln-editor-adapter';

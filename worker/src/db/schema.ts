@@ -398,6 +398,12 @@ export const reviewLink = sqliteTable(
     siteLookup: index('review_link_site_lookup').on(table.siteId, table.expiresAt),
   }),
 );
+export const authRateLimit = sqliteTable('auth_rate_limit', {
+  key: text('key').primaryKey(),
+  windowStart: integer('window_start').notNull(),
+  count: integer('count').notNull().default(0),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});
 
 export const publishedRelease = sqliteTable(
   'published_release',

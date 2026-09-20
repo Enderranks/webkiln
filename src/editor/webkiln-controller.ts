@@ -2,7 +2,7 @@ import type { Component } from 'grapesjs';
 import { getComponentDefinition } from '../components-registry/registry';
 import type { DeviceId, WebKilnProject } from '../types';
 import type { LocalProjectStorage } from '../storage/project-storage';
-import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 import {
   duplicatePage,
   newPage,
@@ -52,7 +52,7 @@ export class WebKilnEditorController {
   private draggedLayerId: string | null = null;
 
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly storage: LocalProjectStorage,
   ) {}
@@ -797,7 +797,7 @@ export class WebKilnEditorController {
 
   private scheduleSave(label = 'Autosave'): void {
     const state = document.querySelector('#saveState');
-    state?.replaceChildren(document.createTextNode('Saving… · GrapesJS'));
+    state?.replaceChildren(document.createTextNode('Saving… · WebKiln'));
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => this.saveNow(label), 450);
   }
@@ -821,7 +821,7 @@ export class WebKilnEditorController {
     this.storage.save(this.project);
     document
       .querySelector('#saveState')
-      ?.replaceChildren(document.createTextNode('✓ Saved · GrapesJS'));
+      ?.replaceChildren(document.createTextNode('✓ Saved · WebKiln'));
     this.renderLayers();
   }
 

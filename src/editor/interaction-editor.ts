@@ -4,13 +4,13 @@ import {
   INTERACTION_ACTIONS,
   INTERACTION_TRIGGERS,
 } from '../models/interaction-schema';
-import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 import { installInteractionRuntime } from './interaction-runtime';
 
 export class InteractionEditorController {
   private previewCleanup: (() => void) | null = null;
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly dirty: () => void,
   ) {}

@@ -1,12 +1,12 @@
 import type { Component } from 'grapesjs';
 import type { CmsCollection } from '../cloud/contracts';
 import type { WebKilnApiClient } from '../cloud/api-client';
-import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 
 export class DynamicBindingController {
   private collections: CmsCollection[] = [];
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly cloud: WebKilnApiClient,
     private readonly workspaceId: string,
     private readonly dirty: () => void,

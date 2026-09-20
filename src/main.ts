@@ -1,4 +1,4 @@
-import { GrapesJSEditorAdapter } from './editor';
+import { WebKilnEditorAdapter } from './editor';
 import { WebKilnEditorController } from './editor/webkiln-controller';
 import { LocalProjectStorage } from './storage/project-storage';
 import type { WebKilnProject } from './types';
@@ -61,7 +61,7 @@ async function bootEditor(siteId?: string, remote?: SiteProject, preview = false
   const canvas = document.querySelector<HTMLElement>('#siteCanvas');
   if (!canvas) throw new Error('WebKiln canvas was not found');
   const project = storage.load();
-  const adapter = new GrapesJSEditorAdapter(canvas);
+  const adapter = new WebKilnEditorAdapter(canvas);
   const cloudProject = new CloudProjectAdapter(cloud);
   if (remote) Object.assign(project, remote.project);
   window.WebKiln = {
@@ -120,12 +120,12 @@ async function bootEditor(siteId?: string, remote?: SiteProject, preview = false
       bindPublishButton(cloud, siteId, sync);
       window.WebKiln.cloudSync = sync;
     }
-    document.documentElement.dataset.editorEngine = 'grapesjs';
+    document.documentElement.dataset.editorEngine = 'webkiln';
     document
       .querySelector('#saveState')
-      ?.replaceChildren(document.createTextNode('✓ Saved · GrapesJS'));
+      ?.replaceChildren(document.createTextNode('✓ Saved · WebKiln'));
   } catch (error) {
-    document.documentElement.dataset.editorEngine = 'grapesjs-error';
+    document.documentElement.dataset.editorEngine = 'webkiln-error';
     document.querySelector('#saveState')?.replaceChildren(document.createTextNode('Editor error'));
     console.error(error);
   }

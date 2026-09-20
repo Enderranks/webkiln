@@ -1,4 +1,4 @@
-import type { GrapesJSEditorAdapter } from '../editor/grapesjs-adapter';
+import type { WebKilnEditorAdapter } from '../editor/webkiln-editor-adapter';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import type { WebKilnProject } from '../types';
 import { CloudAutosaveQueue, type SyncState } from './autosave-queue';
@@ -9,7 +9,7 @@ export class CloudEditorSync {
   private unsubscribe: (() => void) | undefined;
   private conflict: SiteProject | null = null;
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly storage: LocalProjectStorage,
     repository: ProjectRepository,

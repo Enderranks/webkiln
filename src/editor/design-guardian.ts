@@ -7,12 +7,12 @@ import {
   tokenCss,
   tokenUsageCount,
 } from './design-system';
-import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 
 export class DesignGuardianController {
   private system: DesignSystem;
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly dirty: () => void,
   ) {

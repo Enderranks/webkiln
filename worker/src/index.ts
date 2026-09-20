@@ -7,6 +7,7 @@ import { getDb } from './db/client';
 import {
   auditEvent,
   assetMetadata,
+  authRateLimit,
   collaborationInvite,
   pagePermission,
   reviewComment,
@@ -39,12 +40,45 @@ import {
 import type { WebKilnProject } from '../../src/types';
 
 const app = new Hono<{ Bindings: Env }>();
+const MAX_JSON_BYTES = 8 * 1024 * 1024;
+const MAX_FORM_BYTES = 512 * 1024;
 const jsonError = (
   c: Context<{ Bindings: Env }>,
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500,
   code: string,
   message: string,
 ) => c.json({ error: { code, message } }, status);
+
+app.use('*', async (c, next) => {
+  const requestId = c.req.header('x-request-id')?.slice(0, 80) || crypto.randomUUID();
+  c.header('x-request-id', requestId);
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  c.header(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://webkiln-v10-api-dev.underline-dev.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  );
+  const method = c.req.method.toUpperCase();
+  const pathname = new URL(c.req.url).pathname;
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && pathname.startsWith('/api/')) {
+    const origin = c.req.header('origin');
+    if (origin && origin !== c.env.APP_ORIGIN)
+      return jsonError(c, 403, 'ORIGIN_REJECTED', 'Request origin is not allowed');
+    const contentLength = Number(c.req.header('content-length') ?? 0);
+    const limit = pathname.startsWith('/api/forms/') ? MAX_FORM_BYTES : MAX_JSON_BYTES;
+    if (contentLength > limit)
+      return jsonError(c, 413, 'PAYLOAD_TOO_LARGE', 'Request payload exceeds the allowed limit');
+  }
+  await next();
+  const response = c.res;
+  if (pathname.startsWith('/api/')) response.headers.set('Cache-Control', 'no-store');
+  console.log(
+    JSON.stringify({ event: 'request', requestId, method, pathname, status: response.status }),
+  );
+  return response;
+});
 const cmsFieldTypes = new Set([
   'text',
   'rich-text',
@@ -92,6 +126,23 @@ async function cmsAccess(
   if (role === 'editor' && !roleAllows(item.membership.role, 'content'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
   return { ...item, user };
+}
+async function authRequestAllowed(c: Context<{ Bindings: Env }>): Promise<boolean> {
+  const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? 'unknown';
+  const key = `auth:${ip.slice(0, 120)}:${new URL(c.req.url).pathname}`;
+  const windowStart = Math.floor(Date.now() / 60000);
+  const db = getDb(c.env.DB);
+  const current = await db.select().from(authRateLimit).where(eq(authRateLimit.key, key)).get();
+  const count = current?.windowStart === windowStart ? current.count + 1 : 1;
+  if (count > 10) return false;
+  const now = new Date();
+  if (current)
+    await db
+      .update(authRateLimit)
+      .set({ windowStart, count, updatedAt: now })
+      .where(eq(authRateLimit.key, key));
+  else await db.insert(authRateLimit).values({ key, windowStart, count, updatedAt: now });
+  return true;
 }
 function serializeCollection(
   item: typeof cmsCollection.$inferSelect,
@@ -324,7 +375,16 @@ app.use('/api/auth/*', async (c, next) => {
   })(c, next);
   return response;
 });
-app.all('/api/auth/*', (c) => getAuth(c.env).handler(c.req.raw));
+app.all('/api/auth/*', async (c) => {
+  const path = new URL(c.req.url).pathname;
+  if (
+    c.req.method === 'POST' &&
+    /(sign-in|sign-up|password-reset)/i.test(path) &&
+    !(await authRequestAllowed(c))
+  )
+    return jsonError(c, 429, 'RATE_LIMITED', 'Too many authentication attempts; try again shortly');
+  return getAuth(c.env).handler(c.req.raw);
+});
 app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT, database: 'd1' }));
 
 app.get('/api/workspaces', async (c) => {

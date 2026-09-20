@@ -9,7 +9,7 @@ import {
   setIntent,
   validateResponsive,
 } from './responsive-intent';
-import { GrapesJSEditorAdapter } from './grapesjs-adapter';
+import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
 
 const intentOrder: ResponsiveIntentKind[] = [
   'stack-below',
@@ -32,7 +32,7 @@ export class EditingExperienceController {
   private compare = false;
 
   constructor(
-    private readonly adapter: GrapesJSEditorAdapter,
+    private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly dirty: () => void,
   ) {

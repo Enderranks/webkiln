@@ -9,7 +9,7 @@
     form:{id:'form',version:1,category:'pattern',name:'Form',fields:['fields','successMessage'],allowedParents:['section','container'],responsive:true}
   };
   const adapter={
-    name:'WebKilnCanvasAdapter',engine:'native-compatible',grapesJsReady:false,
+    name:'WebKilnCanvasAdapter',engine:'native-compatible',webkilnReady:false,
     getData(){return {schemaVersion:1,html:document.querySelector('#siteCanvas')?.innerHTML||'',selected:document.querySelector('.selected')?.dataset.name||null}},
     loadData(data){if(data?.html){document.querySelector('#siteCanvas').innerHTML=data.html;window.wireSections?.()}},
     select(el){window.select?.(el)},

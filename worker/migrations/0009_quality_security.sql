@@ -1,0 +1,1 @@
+CREATE TABLE auth_rate_limit (key TEXT PRIMARY KEY, window_start INTEGER NOT NULL, count INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL);

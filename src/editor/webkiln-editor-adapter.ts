@@ -14,7 +14,7 @@ const deviceWidths: Record<DeviceId, number> = {
   mobile: 390,
 };
 
-export class GrapesJSEditorAdapter implements EditorAdapter {
+export class WebKilnEditorAdapter implements EditorAdapter {
   private editor: Editor | null = null;
   private readonly listeners = new Map<EditorEventName, Set<(...args: unknown[]) => void>>();
 
@@ -22,12 +22,12 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
 
   async initialize(): Promise<void> {
     if (this.editor) return;
-    const { default: grapesjs } = await import('grapesjs');
+    const { default: webkilnEditorRuntime } = await import('grapesjs');
     const initialHtml = this.sourceContainer.innerHTML;
     const styles = await this.collectStyles();
     this.sourceContainer.innerHTML = '';
-    this.sourceContainer.classList.add('grapesjs-mounted');
-    this.editor = grapesjs.init({
+    this.sourceContainer.classList.add('webkiln-mounted');
+    this.editor = webkilnEditorRuntime.init({
       container: this.sourceContainer,
       headless: false,
       fromElement: false,
@@ -100,7 +100,7 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
   }
 
   private requireEditor(): Editor {
-    if (!this.editor) throw new Error('GrapesJS adapter has not been initialized');
+    if (!this.editor) throw new Error('WebKiln editor adapter has not been initialized');
     return this.editor;
   }
 
@@ -252,7 +252,7 @@ export class GrapesJSEditorAdapter implements EditorAdapter {
   destroy(): void {
     this.editor?.destroy();
     this.editor = null;
-    this.sourceContainer.classList.remove('grapesjs-mounted');
+    this.sourceContainer.classList.remove('webkiln-mounted');
     this.emit('destroy');
   }
 }

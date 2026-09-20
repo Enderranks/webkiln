@@ -1,4 +1,4 @@
-import type { GrapesJSEditorAdapter } from './editor';
+import type { WebKilnEditorAdapter } from './editor';
 import type { LocalProjectStorage } from './storage/project-storage';
 import type { WebKilnProject } from './types';
 
@@ -12,7 +12,7 @@ declare global {
   }
   interface Window {
     WebKiln?: {
-      adapter?: GrapesJSEditorAdapter;
+      adapter?: WebKilnEditorAdapter;
       project?: WebKilnProject;
       storage?: LocalProjectStorage;
       recoverLegacy?: () => WebKilnProject | null;
