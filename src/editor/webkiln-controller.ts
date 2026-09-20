@@ -13,6 +13,7 @@ import {
   setHomepage,
   uniqueSlug,
 } from '../models/page-manager';
+import { deterministicSuggestion } from './ai-assist';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -74,6 +75,9 @@ export class WebKilnEditorController {
     ['publish', 'Publish', 'Save a publish checkpoint'],
     ['save-revision', 'Save revision', 'Create a named local checkpoint'],
     ['search-settings', 'Search settings', 'Open site settings'],
+    ['ai-outline', 'Suggest site outline', 'Use WebKiln’s local fallback suggestions'],
+    ['ai-seo', 'Suggest SEO description', 'Draft metadata without sending project data externally'],
+    ['ai-accessibility', 'Suggest accessibility improvements', 'Review safe, deterministic checks'],
   ] as const;
 
   constructor(
@@ -249,6 +253,16 @@ export class WebKilnEditorController {
     if (command === 'preview') this.togglePreview();
     if (command === 'publish') this.saveNow('Published checkpoint');
     if (command === 'save-revision') this.saveNow('Named checkpoint');
+    if (command === 'ai-outline') this.showAiSuggestion('site-outline');
+    if (command === 'ai-seo') this.showAiSuggestion('seo-description');
+    if (command === 'ai-accessibility') this.showAiSuggestion('accessibility');
+  }
+
+  private showAiSuggestion(kind: 'site-outline' | 'seo-description' | 'accessibility'): void {
+    this.toast(
+      'Local suggestion · AI provider not connected',
+      deterministicSuggestion(kind, this.project),
+    );
   }
 
   private openPanel(panel: string): void {
