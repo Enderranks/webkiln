@@ -46,7 +46,7 @@ async function boot(): Promise<void> {
       }
       document.documentElement.dataset.sessionState = 'authenticated';
       if (route.kind === 'dashboard') {
-        await renderDashboard(cloud, storage, session);
+        await renderDashboard(cloud, storage, session, route.section, route.workspaceId);
         return;
       }
       if (route.kind === 'onboarding') {

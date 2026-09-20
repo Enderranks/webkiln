@@ -32,10 +32,12 @@ export async function renderDashboard(
   cloud: WebKilnApiClient,
   storage: LocalProjectStorage,
   session: Session,
+  initialSection = 'overview',
+  initialWorkspaceId = '',
 ): Promise<void> {
   document.body.innerHTML = `<main class="cloud-app customer-dashboard"><header class="cloud-topbar dashboard-topbar"><a class="cloud-brand" href="/" aria-label="WebKiln home"><span class="brand-mark">W</span><span>WEBKILN</span></a><div class="dashboard-context"><span class="connection-dot"></span><span>Cloud workspace</span></div><div class="account-menu"><details><summary>${esc(session.user.displayName)}</summary><div class="account-popover"><strong>${esc(session.user.displayName)}</strong><small>${esc(session.user.email)}</small><button type="button" data-nav="account">Account settings</button><button type="button" data-signout>Sign out</button></div></details></div></header><div class="dashboard-frame"><aside class="dashboard-sidebar"><p class="sidebar-label">Workspace</p><nav aria-label="Dashboard navigation">${sections.map((section) => `<button type="button" data-nav="${section}" class="dashboard-nav ${section === 'overview' ? 'active' : ''}"><span>${navIcon(section)}</span>${sectionLabel(section)}</button>`).join('')}</nav><div class="sidebar-footer"><button type="button" data-local-editor>Open local editor</button><small>WebKiln customer cloud</small></div></aside><section class="dashboard-main"><div data-dashboard-view></div><div class="cloud-toast" data-dashboard-message role="status" aria-live="polite"></div></section></div></main>`;
   let workspaces: Workspace[] = [];
-  let selectedWorkspaceId = '';
+  let selectedWorkspaceId = initialWorkspaceId;
   let sites: CloudSite[] = [];
   let duplicateIds = new Set<string>();
   const view = document.querySelector<HTMLElement>('[data-dashboard-view]')!;
@@ -587,9 +589,13 @@ export async function renderDashboard(
   view.innerHTML = loading('Loading workspace');
   try {
     workspaces = await cloud.listWorkspaces();
-    selectedWorkspaceId = workspaces[0]?.id ?? '';
+    selectedWorkspaceId = workspaces.some((workspace) => workspace.id === initialWorkspaceId)
+      ? initialWorkspaceId
+      : (workspaces[0]?.id ?? '');
     if (selectedWorkspaceId) sites = await cloud.listSites(selectedWorkspaceId);
-    renderSection('overview');
+    renderSection(
+      (sections.includes(initialSection as Section) ? initialSection : 'overview') as Section,
+    );
   } catch (error) {
     view.innerHTML = errorState(error, 'overview');
   }

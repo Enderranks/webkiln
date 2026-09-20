@@ -32,6 +32,18 @@ describe('cloud application routing', () => {
     );
     expect(protectedRedirect({ kind: 'local' }, null)).toBeNull();
   });
+  it('routes customer areas to authenticated dashboard surfaces', () => {
+    expect(parseRoute('/workspace/workspace-1')).toEqual({
+      kind: 'dashboard',
+      workspaceId: 'workspace-1',
+    });
+    expect(parseRoute('/site/site-1/cms')).toEqual({
+      kind: 'dashboard',
+      section: 'collections',
+      siteId: 'site-1',
+    });
+    expect(parseRoute('/account')).toEqual({ kind: 'dashboard', section: 'account' });
+  });
 });
 
 describe('cloud autosave behavior', () => {
