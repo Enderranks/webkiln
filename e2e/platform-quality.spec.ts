@@ -51,6 +51,15 @@ test.describe('WebKiln platform quality', () => {
     expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
   });
 
+  test('command palette opens and filters editor commands', async ({ page }) => {
+    await page.goto('/');
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+KeyK' : 'Control+KeyK');
+    await expect(page.locator('#commandPalette')).toBeVisible();
+    await page.locator('#commandSearch').fill('publish');
+    await expect(page.locator('[data-command="publish"]')).toBeVisible();
+    await expect(page.locator('[data-command="add-section"]')).toHaveCount(0);
+  });
+
   test('protected cloud routes reject unauthenticated access', async ({ request }) => {
     test.skip(!process.env.WEBKILN_E2E_BASE_URL, 'Requires a deployed Worker base URL');
     const response = await request.get('/api/workspaces/no-workspace/members');

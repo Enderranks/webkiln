@@ -986,3 +986,74 @@ button {
 .plan-grid article.featured p {
   color: #d0d5d6;
 }
+
+.command-button {
+  min-width: 54px;
+}
+.command-modal {
+  width: min(620px, calc(100vw - 32px));
+  background: #111417;
+  border: 1px solid #3a4247;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+.command-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 10px;
+  padding: 0 12px;
+  height: 46px;
+  background: #0b0d0f;
+  border: 1px solid #30383d;
+  border-radius: 8px;
+  color: #8f999f;
+}
+.command-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4f5f3;
+}
+.command-list {
+  display: grid;
+  gap: 5px;
+  max-height: 360px;
+  overflow: auto;
+}
+.command-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #f4f5f3;
+  text-align: left;
+  cursor: pointer;
+}
+.command-list button:hover,
+.command-list button:focus-visible {
+  background: #1c2226;
+  border-color: #d6ad61;
+  outline: none;
+}
+.command-list small,
+.command-hint,
+.command-empty {
+  color: #8f999f;
+  font-size: 12px;
+}
+.command-hint {
+  margin: 14px 0 0;
+}
+.command-hint kbd {
+  padding: 2px 5px;
+  border: 1px solid #3a4247;
+  border-radius: 4px;
+  color: #f4f5f3;
+}

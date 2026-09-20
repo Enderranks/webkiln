@@ -72,6 +72,14 @@
         <button id="helpBtn" class="icon-btn help-button" type="button" aria-label="Open help">
           ?
         </button>
+        <button
+          id="commandBtn"
+          class="ghost-btn command-button"
+          type="button"
+          aria-label="Open command palette"
+        >
+          ⌘K
+        </button>
         <button id="setupBtn" class="ghost-btn" type="button">Site setup</button>
         <button id="previewBtn" class="ghost-btn" type="button">Preview</button>
         <button id="publishBtn" class="primary-btn" type="button">Publish site</button>
@@ -590,6 +598,32 @@
     <div id="toast" class="toast" role="status" aria-live="polite">
       <span>✓</span>
       <div><strong>Site published</strong><small>Your latest changes are live.</small></div>
+    </div>
+    <div id="commandPalette" class="modal-backdrop" hidden>
+      <section class="command-modal" role="dialog" aria-modal="true" aria-labelledby="commandTitle">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">WebKiln commands</p>
+            <h2 id="commandTitle">What would you like to do?</h2>
+          </div>
+          <button
+            id="closeCommand"
+            class="mini-btn"
+            type="button"
+            aria-label="Close command palette"
+          >
+            ×
+          </button>
+        </div>
+        <label class="command-search"
+          ><span>⌕</span
+          ><input id="commandSearch" type="search" placeholder="Search commands" autocomplete="off"
+        /></label>
+        <div id="commandList" class="command-list" role="listbox" aria-label="Commands"></div>
+        <p class="command-hint">
+          Press <kbd>Esc</kbd> to close · <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>K</kbd> to open
+        </p>
+      </section>
     </div>
     <script type="module" src="/main.ts"></script>
   </body>

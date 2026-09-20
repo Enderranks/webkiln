@@ -50,6 +50,19 @@ export class WebKilnEditorController {
   private expandedLayerIds = new Set<string>();
   private clipboard: Component | null = null;
   private draggedLayerId: string | null = null;
+  private readonly commands = [
+    ['add-section', 'Add section', 'Insert a new hero section'],
+    ['add-component', 'Add component', 'Open reusable components'],
+    ['switch-page', 'Switch page', 'Open the page manager'],
+    ['switch-breakpoint', 'Switch breakpoint', 'Open responsive controls'],
+    ['open-layers', 'Open layers', 'Inspect and reorder page layers'],
+    ['open-design', 'Open design system', 'Open site theme controls'],
+    ['open-health', 'Open site health', 'Open site settings and checks'],
+    ['preview', 'Preview', 'Preview the current page'],
+    ['publish', 'Publish', 'Save a publish checkpoint'],
+    ['save-revision', 'Save revision', 'Create a named local checkpoint'],
+    ['search-settings', 'Search settings', 'Open site settings'],
+  ] as const;
 
   constructor(
     private readonly adapter: WebKilnEditorAdapter,
@@ -93,6 +106,7 @@ export class WebKilnEditorController {
       .querySelector('#publishBtn')
       ?.addEventListener('click', () => this.saveNow('Published checkpoint'));
     document.addEventListener('keydown', (event) => this.handleShortcut(event));
+    this.bindCommandPalette();
     document.querySelectorAll<HTMLButtonElement>('.rail-tab').forEach((button) =>
       button.addEventListener('click', () => {
         document.querySelectorAll('.rail-tab').forEach((item) => item.classList.remove('active'));
@@ -121,6 +135,83 @@ export class WebKilnEditorController {
       ?.addEventListener('click', () => this.saveNow('Named checkpoint'));
     this.bindCustomCode();
     this.bindRecovery();
+  }
+
+  private bindCommandPalette(): void {
+    document
+      .querySelector('#commandBtn')
+      ?.addEventListener('click', () => this.openCommandPalette());
+    document
+      .querySelector('#closeCommand')
+      ?.addEventListener('click', () => this.closeCommandPalette());
+    document.querySelector('#commandPalette')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) this.closeCommandPalette();
+    });
+    document.querySelector('#commandSearch')?.addEventListener('input', (event) => {
+      this.renderCommandList((event.target as HTMLInputElement).value);
+    });
+    document.querySelector('#commandList')?.addEventListener('click', (event) => {
+      const command = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-command]');
+      if (command) this.executeCommand(command.dataset.command ?? '');
+    });
+  }
+
+  private openCommandPalette(): void {
+    const palette = document.querySelector<HTMLElement>('#commandPalette');
+    if (!palette) return;
+    palette.hidden = false;
+    this.renderCommandList();
+    document.querySelector<HTMLInputElement>('#commandSearch')?.focus();
+  }
+
+  private closeCommandPalette(): void {
+    const palette = document.querySelector<HTMLElement>('#commandPalette');
+    if (palette) palette.hidden = true;
+  }
+
+  private renderCommandList(query = ''): void {
+    const list = document.querySelector<HTMLElement>('#commandList');
+    if (!list) return;
+    const normalized = query.trim().toLowerCase();
+    const commands = this.commands.filter(([id, label, description]) =>
+      `${id} ${label} ${description}`.toLowerCase().includes(normalized),
+    );
+    list.innerHTML = commands.length
+      ? commands
+          .map(
+            ([id, label, description]) =>
+              `<button type="button" data-command="${id}" role="option"><strong>${label}</strong><small>${description}</small></button>`,
+          )
+          .join('')
+      : '<p class="command-empty">No matching commands</p>';
+  }
+
+  private executeCommand(command: string): void {
+    this.closeCommandPalette();
+    if (command === 'add-section') this.addBlock('hero');
+    if (command === 'add-component') this.openPanel('components');
+    if (command === 'switch-page') this.openPanel('pages');
+    if (command === 'switch-breakpoint')
+      document
+        .querySelector<HTMLElement>('.editing-experience-toolbar')
+        ?.scrollIntoView({ behavior: 'smooth' });
+    if (command === 'open-layers') this.openPanel('layers');
+    if (command === 'open-design') this.openPanel('theme');
+    if (command === 'open-health' || command === 'search-settings') this.openPanel('site');
+    if (command === 'preview') this.togglePreview();
+    if (command === 'publish') this.saveNow('Published checkpoint');
+    if (command === 'save-revision') this.saveNow('Named checkpoint');
+  }
+
+  private openPanel(panel: string): void {
+    document
+      .querySelectorAll('.rail-tab')
+      .forEach((item) =>
+        item.classList.toggle('active', (item as HTMLElement).dataset.panel === panel),
+      );
+    document
+      .querySelectorAll('.panel')
+      .forEach((item) => item.classList.toggle('active', item.id === `${panel}Panel`));
   }
 
   private bindBlocks(): void {
@@ -739,6 +830,15 @@ export class WebKilnEditorController {
   }
 
   private handleShortcut(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.openCommandPalette();
+      return;
+    }
+    if (event.key === 'Escape' && !document.querySelector<HTMLElement>('#commandPalette')?.hidden) {
+      this.closeCommandPalette();
+      return;
+    }
     const typing =
       ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '') ||
       document.activeElement?.getAttribute('contenteditable') === 'true';
