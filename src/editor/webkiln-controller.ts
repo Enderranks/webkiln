@@ -42,6 +42,15 @@ function componentLabel(component: Component | null): string {
   return String(component.get('name') || component.get('tagName') || 'Element');
 }
 
+function escapePageText(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ??
+      character,
+  );
+}
+
 export class WebKilnEditorController {
   private selected: Component | null = null;
   private saveTimer: number | undefined;
@@ -277,6 +286,44 @@ export class WebKilnEditorController {
         const copy = duplicatePage(this.project, page);
         this.renderPages();
         this.switchPage(copy.id);
+      }
+      if (action === 'rename') {
+        const name = window.prompt('Page name', page.name)?.trim();
+        if (!name) return;
+        page.name = name;
+        page.slug = uniqueSlug(this.project, name, page.id);
+        page.seo = { ...(page.seo ?? { title: name, description: '' }), title: name };
+        page.updatedAt = new Date().toISOString();
+        this.renderPages();
+        this.saveNow('Page renamed');
+      }
+      if (action === 'navigation') {
+        page.settings = {
+          ...(page.settings ?? { showInNavigation: true, passwordProtected: false }),
+          showInNavigation: page.settings?.showInNavigation === false,
+        };
+        this.renderPages();
+        this.saveNow('Navigation visibility changed');
+      }
+      if (action === 'protect') {
+        page.settings = {
+          ...(page.settings ?? { showInNavigation: true, passwordProtected: false }),
+          passwordProtected: page.settings?.passwordProtected !== true,
+        };
+        this.renderPages();
+        this.saveNow('Page protection changed');
+      }
+      if (action === 'seo') {
+        const title = window.prompt('SEO title', page.seo?.title ?? page.name);
+        if (title === null) return;
+        const description = window.prompt('SEO description', page.seo?.description ?? '') ?? '';
+        page.seo = {
+          ...(page.seo ?? { title: page.name, description: '' }),
+          title: title.trim() || page.name,
+          description: description.trim(),
+        };
+        page.updatedAt = new Date().toISOString();
+        this.saveNow('Page SEO updated');
       }
       if (action === 'delete') this.deletePage(page.id);
       if (action === 'up' || action === 'down') this.reorderPage(page.id, action === 'up' ? -1 : 1);
@@ -847,13 +894,13 @@ export class WebKilnEditorController {
     [...this.project.pages].reverse().forEach((page) => {
       const row = document.createElement('div');
       row.className = `page-row ${page.id === this.project.currentPageId ? 'active' : ''}`;
-      row.innerHTML = `<button data-page-action="open" data-page-id="${page.id}" class="page-open"><span>▧</span><strong>${page.name}</strong><small>${page.isHomepage ? 'Home · ' : ''}${page.slug}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${page.id}" aria-label="Set homepage">⌂</button><button data-page-action="up" data-page-id="${page.id}">↑</button><button data-page-action="down" data-page-id="${page.id}">↓</button><button data-page-action="duplicate" data-page-id="${page.id}">＋</button><button data-page-action="delete" data-page-id="${page.id}">×</button></span>`;
+      row.innerHTML = `<button data-page-action="open" data-page-id="${escapePageText(page.id)}" class="page-open"><span>▧</span><strong>${escapePageText(page.name)}</strong><small>${page.isHomepage ? 'Home · ' : ''}${escapePageText(page.slug)}${page.settings?.showInNavigation === false ? ' · Hidden' : ''}${page.settings?.passwordProtected ? ' · Protected' : ''}</small></button><span class="page-actions"><button data-page-action="home" data-page-id="${escapePageText(page.id)}" aria-label="Set homepage">⌂</button><button data-page-action="rename" data-page-id="${escapePageText(page.id)}" aria-label="Rename page">Aa</button><button data-page-action="seo" data-page-id="${escapePageText(page.id)}" aria-label="Edit SEO">SEO</button><button data-page-action="navigation" data-page-id="${escapePageText(page.id)}" aria-label="Toggle navigation visibility">☰</button><button data-page-action="protect" data-page-id="${escapePageText(page.id)}" aria-label="Toggle page protection">🔒</button><button data-page-action="up" data-page-id="${escapePageText(page.id)}" aria-label="Move page up">↑</button><button data-page-action="down" data-page-id="${escapePageText(page.id)}" aria-label="Move page down">↓</button><button data-page-action="duplicate" data-page-id="${escapePageText(page.id)}" aria-label="Duplicate page">＋</button><button data-page-action="delete" data-page-id="${escapePageText(page.id)}" aria-label="Archive page">×</button></span>`;
       tree.before(row);
     });
     this.project.deletedPages.forEach((page) => {
       const row = document.createElement('div');
       row.className = 'deleted-page-row';
-      row.innerHTML = `<span>↺ ${page.name}</span><button data-page-action="restore" data-page-id="${page.id}">Restore</button>`;
+      row.innerHTML = `<span>↺ ${escapePageText(page.name)}</span><button data-page-action="restore" data-page-id="${escapePageText(page.id)}">Restore</button>`;
       tree.before(row);
     });
   }
