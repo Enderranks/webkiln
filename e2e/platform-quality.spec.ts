@@ -51,6 +51,14 @@ test.describe('WebKiln platform quality', () => {
     expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
   });
 
+  test('laptop breakpoint preview is selectable', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Breakpoint toolbar is desktop-only');
+    await page.goto('/');
+    await page.locator('.device[data-width="laptop"]').click();
+    await expect(page.locator('#canvasSizeStatus')).toHaveText('Canvas 1024 px');
+    await expect(page.locator('.device[data-width="laptop"]')).toHaveClass(/active/);
+  });
+
   test('command palette opens and filters editor commands', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => document.documentElement.dataset.editorEngine === 'webkiln');

@@ -932,7 +932,7 @@ export class WebKilnEditorController {
   }
 
   private setDevice(device: DeviceId): void {
-    if (!['desktop', 'tablet', 'mobile'].includes(device)) return;
+    if (!['desktop', 'laptop', 'tablet', 'mobile'].includes(device)) return;
     this.device = device;
     this.adapter.setDevice(device);
     document
@@ -1114,8 +1114,7 @@ export class WebKilnEditorController {
 
   private stripDuplicateIds(component: Component): void {
     const attrs = component.getAttributes() as Record<string, string>;
-    if (attrs.id)
-      component.addAttributes({ id: `${attrs.id}-${Math.random().toString(36).slice(2, 7)}` });
+    if (attrs.id) component.addAttributes({ id: `${attrs.id}-${crypto.randomUUID().slice(0, 8)}` });
     component.components().models.forEach((child) => this.stripDuplicateIds(child));
   }
 
