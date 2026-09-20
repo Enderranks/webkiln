@@ -45,7 +45,7 @@ async function boot(): Promise<void> {
         await renderDashboard(cloud, storage, session);
         return;
       }
-      await bootCloudEditor(route.siteId, session);
+      await bootCloudEditor(route.siteId, session, route.preview);
     } catch (error) {
       renderCloudFailure(error instanceof Error ? error.message : 'Could not open WebKiln.');
     }
@@ -54,7 +54,7 @@ async function boot(): Promise<void> {
   await bootEditor();
 }
 
-async function bootEditor(siteId?: string, remote?: SiteProject): Promise<void> {
+async function bootEditor(siteId?: string, remote?: SiteProject, preview = false): Promise<void> {
   const canvas = document.querySelector<HTMLElement>('#siteCanvas');
   if (!canvas) throw new Error('WebKiln canvas was not found');
   const project = storage.load();
@@ -84,6 +84,7 @@ async function bootEditor(siteId?: string, remote?: SiteProject): Promise<void> 
     new DesignGuardianController(adapter, project, () =>
       editorController.markDirty('Design system'),
     ).start();
+    if (preview) adapter.setPreview(true);
     renderAccountMenu(cloud);
     renderCloudStatus(cloud, siteId);
     if (siteId && remote) {
@@ -227,9 +228,9 @@ async function renderPublishPanel(
   }
 }
 
-async function bootCloudEditor(siteId: string, session: Session): Promise<void> {
+async function bootCloudEditor(siteId: string, session: Session, preview = false): Promise<void> {
   void session;
-  await bootEditor(siteId, await cloud.getProject(siteId));
+  await bootEditor(siteId, await cloud.getProject(siteId), preview);
 }
 
 function renderCloudStatus(client: WebKilnApiClient, siteId?: string): void {

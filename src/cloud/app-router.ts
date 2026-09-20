@@ -3,7 +3,7 @@ export type AppRoute =
   | { kind: 'login' }
   | { kind: 'signup' }
   | { kind: 'dashboard' }
-  | { kind: 'editor'; siteId: string };
+  | { kind: 'editor'; siteId: string; preview?: boolean };
 
 export function parseRoute(pathname = window.location.pathname): AppRoute {
   const path = pathname.replace(/\/+$/, '') || '/';
@@ -11,7 +11,14 @@ export function parseRoute(pathname = window.location.pathname): AppRoute {
   if (path === '/signup') return { kind: 'signup' };
   if (path === '/dashboard') return { kind: 'dashboard' };
   const editorMatch = path.match(/^\/editor\/([^/]+)$/);
-  if (editorMatch) return { kind: 'editor', siteId: decodeURIComponent(editorMatch[1]) };
+  if (editorMatch)
+    return {
+      kind: 'editor',
+      siteId: decodeURIComponent(editorMatch[1]),
+      preview:
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('preview') === '1',
+    };
   return { kind: 'local' };
 }
 
