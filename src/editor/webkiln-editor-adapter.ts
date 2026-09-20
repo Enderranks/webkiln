@@ -214,6 +214,15 @@ export class WebKilnEditorAdapter implements EditorAdapter {
     this.emit('device', device);
   }
 
+  setCustomDevice(id: string, width: number): void {
+    const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '-');
+    this.getRoot()?.setClass(`site-canvas ${safeId}`);
+    this.sourceContainer.classList.remove('desktop', 'laptop', 'tablet', 'mobile');
+    this.sourceContainer.classList.add(safeId);
+    this.sourceContainer.style.width = `${width}px`;
+    this.emit('device', id as DeviceId);
+  }
+
   getSelectedComponent(): Component | null {
     return this.requireEditor().getSelected() ?? null;
   }

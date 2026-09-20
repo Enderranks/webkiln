@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject } from '../src/models/project-schema';
 import {
+  addCustomBreakpoint,
   intentClass,
   normalizeEditorSettings,
   responsiveCss,
@@ -75,5 +76,14 @@ describe('responsive intent engine', () => {
     expect(warnings.map((item) => item.kind)).toEqual(
       expect.arrayContaining(['overflow', 'touch-target']),
     );
+  });
+
+  it('adds bounded custom breakpoints with nearest wider inheritance', () => {
+    const settings = normalizeEditorSettings();
+    const result = addCustomBreakpoint(settings, 'Phone landscape', 600);
+    expect(result.breakpoint.id).toBe('custom-600');
+    expect(result.breakpoint.inheritedFrom).toBe('tablet');
+    expect(result.settings.breakpoints.map((item) => item.id)).toContain('custom-600');
+    expect(() => addCustomBreakpoint(settings, 'Too narrow', 200)).toThrow('between 320px');
   });
 });

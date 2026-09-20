@@ -138,3 +138,4 @@
     display: none;
   }
 }
+.custom-breakpoint-control{display:flex;align-items:center;gap:4px;margin-left:6px}.custom-breakpoint-control input{width:56px;height:28px;padding:0 5px;background:#0d1012;color:#dce1df;border:1px solid var(--line);border-radius:5px;font-size:10px}.custom-breakpoint-control button{width:28px;height:28px;border:1px solid var(--line);border-radius:5px;background:#151a1d;color:var(--gold);cursor:pointer}.custom-breakpoint-control button:hover,.custom-breakpoint-control button:focus-visible{border-color:var(--gold);outline:2px solid rgba(214,173,97,.25);outline-offset:1px}

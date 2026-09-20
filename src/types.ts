@@ -180,6 +180,7 @@ export interface EditorAdapter {
   undo(): void;
   redo(): void;
   setDevice(device: DeviceId): void;
+  setCustomDevice(id: string, width: number): void;
   getSelectedComponent(): unknown;
   subscribe(event: EditorEventName, callback: (...args: unknown[]) => void): () => void;
   destroy(): void;

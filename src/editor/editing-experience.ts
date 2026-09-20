@@ -3,6 +3,7 @@ import { createDefaultEditorSettings } from '../models/project-schema';
 import type { EditingMode, ResponsiveIntentKind, WebKilnProject } from '../types';
 import {
   INTENT_LABELS,
+  addCustomBreakpoint,
   intentClass,
   normalizeEditorSettings,
   responsiveCss,
@@ -58,7 +59,11 @@ export class EditingExperienceController {
     const wrap = document.createElement('div');
     wrap.dataset.editingExperience = 'true';
     wrap.className = 'editing-experience-toolbar';
-    wrap.innerHTML = `<label class="mode-picker">Mode<select id="editingMode" aria-label="Editing mode"><option value="guided">Guided</option><option value="standard">Standard</option><option value="pro">Pro</option></select></label><div class="breakpoint-picker" role="group" aria-label="Responsive breakpoint"><button type="button" data-breakpoint="desktop">Desktop</button><button type="button" data-breakpoint="laptop">Laptop</button><button type="button" data-breakpoint="tablet">Tablet</button><button type="button" data-breakpoint="mobile">Mobile</button><button type="button" data-compare="true">Compare</button></div>`;
+    wrap.innerHTML = `<label class="mode-picker">Mode<select id="editingMode" aria-label="Editing mode"><option value="guided">Guided</option><option value="standard">Standard</option><option value="pro">Pro</option></select></label><div class="breakpoint-picker" role="group" aria-label="Responsive breakpoint"><button type="button" data-breakpoint="desktop">Desktop</button><button type="button" data-breakpoint="laptop">Laptop</button><button type="button" data-breakpoint="tablet">Tablet</button><button type="button" data-breakpoint="mobile">Mobile</button><button type="button" data-compare="true">Compare</button></div><div class="custom-breakpoint-control"><input id="customBreakpointWidth" type="number" min="320" max="2400" step="1" placeholder="px" aria-label="Custom breakpoint width" /><button type="button" data-add-breakpoint title="Add custom breakpoint">+</button></div>`;
+    const picker = wrap.querySelector<HTMLElement>('.breakpoint-picker');
+    this.project
+      .editorSettings!.breakpoints.filter((item) => item.id.startsWith('custom-'))
+      .forEach((item) => this.appendBreakpointButton(picker, item));
     topbar.insertBefore(wrap, topbar.querySelector('.top-actions'));
   }
 
@@ -92,21 +97,68 @@ export class EditingExperienceController {
   }
 
   private bindResponsiveControls(): void {
-    document.querySelectorAll<HTMLButtonElement>('[data-breakpoint]').forEach((button) =>
-      button.addEventListener('click', () => {
-        this.breakpoint = button.dataset.breakpoint ?? 'mobile';
-        document
-          .querySelectorAll('[data-breakpoint]')
-          .forEach((item) => item.classList.toggle('active', item === button));
-        this.adapter.setDevice(this.breakpoint as 'desktop' | 'laptop' | 'tablet' | 'mobile');
-        this.renderResponsivePanel();
-      }),
-    );
+    document
+      .querySelectorAll<HTMLButtonElement>('[data-breakpoint]')
+      .forEach((button) => this.bindBreakpointButton(button));
+    document.querySelector('[data-add-breakpoint]')?.addEventListener('click', () => {
+      const input = document.querySelector<HTMLInputElement>('#customBreakpointWidth');
+      try {
+        const result = addCustomBreakpoint(
+          this.project.editorSettings!,
+          `Custom ${input?.value ?? ''}px`,
+          Number(input?.value),
+        );
+        this.project.editorSettings = result.settings;
+        const picker = document.querySelector<HTMLElement>('.breakpoint-picker');
+        const button =
+          Array.from(picker?.querySelectorAll<HTMLButtonElement>('[data-breakpoint]') ?? []).find(
+            (item) => item.dataset.breakpoint === result.breakpoint.id,
+          ) ?? this.appendBreakpointButton(picker, result.breakpoint);
+        this.bindBreakpointButton(button);
+        this.selectBreakpoint(button, result.breakpoint.id, result.breakpoint.width);
+        this.dirty();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'Could not add breakpoint.');
+      }
+    });
     document.querySelector('[data-compare]')?.addEventListener('click', (event) => {
       this.compare = !this.compare;
       (event.currentTarget as HTMLElement).classList.toggle('active', this.compare);
       document.body.classList.toggle('responsive-compare', this.compare);
     });
+  }
+
+  private appendBreakpointButton(
+    picker: HTMLElement | null,
+    breakpoint: { id: string; label: string; width: number },
+  ): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.breakpoint = breakpoint.id;
+    button.dataset.breakpointWidth = String(breakpoint.width);
+    button.textContent = breakpoint.label;
+    picker?.insertBefore(button, picker.querySelector('[data-compare]') ?? null);
+    return button;
+  }
+
+  private bindBreakpointButton(button: HTMLButtonElement): void {
+    button.addEventListener('click', () =>
+      this.selectBreakpoint(
+        button,
+        button.dataset.breakpoint ?? 'mobile',
+        Number(button.dataset.breakpointWidth),
+      ),
+    );
+  }
+
+  private selectBreakpoint(button: HTMLButtonElement, id: string, width: number): void {
+    this.breakpoint = id;
+    document
+      .querySelectorAll('[data-breakpoint]')
+      .forEach((item) => item.classList.toggle('active', item === button));
+    if (id.startsWith('custom-')) this.adapter.setCustomDevice(id, width);
+    else this.adapter.setDevice(id as 'desktop' | 'laptop' | 'tablet' | 'mobile');
+    this.renderResponsivePanel();
   }
 
   private renderResponsivePanel(): void {

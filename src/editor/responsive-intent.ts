@@ -34,6 +34,34 @@ export function normalizeEditorSettings(value?: Partial<EditorSettings>): Editor
   };
 }
 
+export function addCustomBreakpoint(
+  settings: EditorSettings,
+  label: string,
+  width: number,
+): { settings: EditorSettings; breakpoint: ResponsiveBreakpoint } {
+  const normalizedWidth = Math.round(width);
+  if (!Number.isFinite(normalizedWidth) || normalizedWidth < 320 || normalizedWidth > 2400)
+    throw new Error('Custom breakpoints must be between 320px and 2400px.');
+  const existing = settings.breakpoints.find((item) => item.width === normalizedWidth);
+  if (existing) return { settings, breakpoint: existing };
+  const inheritedFrom = [...settings.breakpoints]
+    .filter((item) => item.width > normalizedWidth)
+    .sort((a, b) => a.width - b.width)[0]?.id;
+  const breakpoint: ResponsiveBreakpoint = {
+    id: `custom-${normalizedWidth}`,
+    label: label.trim() || `Custom ${normalizedWidth}px`,
+    width: normalizedWidth,
+    ...(inheritedFrom ? { inheritedFrom } : {}),
+  };
+  return {
+    settings: {
+      ...settings,
+      breakpoints: [...settings.breakpoints, breakpoint].sort((a, b) => b.width - a.width),
+    },
+    breakpoint,
+  };
+}
+
 function media(breakpoint: ResponsiveBreakpoint): string {
   return breakpoint.width <= 390
     ? `(max-width:${breakpoint.width}px)`
