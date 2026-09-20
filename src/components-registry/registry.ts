@@ -301,6 +301,60 @@ const definitions: Array<[string, string, ComponentDefinition['category'], strin
     'commerce',
     '<section class="wk-smart-section wk-ticket-listing" data-wk-smart="ticket-listing"><h2>Tickets</h2><div class="columns"><article><h3>General admission</h3><p>From $25 · Available now</p></article></div></section>',
   ],
+  [
+    'player-count',
+    'Player count',
+    'content',
+    '<section class="wk-smart-section wk-player-count" data-wk-smart="player-count"><h2>Built for your community</h2><p><strong>10</strong> players online</p></section>',
+  ],
+  [
+    'knowledge-base',
+    'Knowledge-base links',
+    'content',
+    '<section class="wk-smart-section wk-knowledge-base" data-wk-smart="knowledge-base"><h2>Need a hand?</h2><ul><li><a href="#">Getting started</a></li><li><a href="#">Troubleshooting</a></li></ul></section>',
+  ],
+  [
+    'customer-panel-login',
+    'Customer-panel login link',
+    'content',
+    '<a class="wk-customer-panel-login button" data-wk-smart="customer-panel-login" href="#panel">Open customer panel</a>',
+  ],
+  [
+    'rental-catalog',
+    'Rental catalog',
+    'commerce',
+    '<section class="wk-smart-section wk-rental-catalog" data-wk-smart="rental-catalog"><h2>Explore the catalog</h2><div class="columns"><article><h3>Item name</h3><p>Price · Availability · Details</p></article></div></section>',
+  ],
+  [
+    'package-builder',
+    'Package builder',
+    'commerce',
+    '<section class="wk-smart-section wk-package-builder" data-wk-smart="package-builder"><h2>Build your package</h2><label>Package<select><option>Choose an option</option></select></label><p>Selected options and estimate appear here.</p></section>',
+  ],
+  [
+    'vendor-listing',
+    'Vendor listing',
+    'content',
+    '<section class="wk-smart-section wk-vendor-listing" data-wk-smart="vendor-listing"><h2>Trusted vendors</h2><div class="columns"><article><h3>Vendor name</h3><p>Category · Contact · Details</p></article></div></section>',
+  ],
+  [
+    'staff-listing',
+    'Staff listing',
+    'content',
+    '<section class="wk-smart-section wk-staff-listing" data-wk-smart="staff-listing"><h2>Meet the staff</h2><div class="columns"><article><h3>Staff member</h3><p>Role · Contact · Accessibility description</p></article></div></section>',
+  ],
+  [
+    'floor-plan',
+    'Floor-plan placeholder',
+    'media',
+    '<figure class="wk-smart-section wk-floor-plan" data-wk-smart="floor-plan"><div role="img" aria-label="Floor plan placeholder">Floor plan preview</div><figcaption>Add an accessible floor-plan description.</figcaption></figure>',
+  ],
+  [
+    'customer-portal',
+    'Customer portal link',
+    'content',
+    '<a class="wk-customer-portal button" data-wk-smart="customer-portal" href="#portal">Open customer portal</a>',
+  ],
 ];
 
 const SMART_SECTION_METADATA: Record<string, NonNullable<ComponentDefinition['smartSection']>> = {
@@ -379,6 +433,36 @@ const SMART_SECTION_METADATA: Record<string, NonNullable<ComponentDefinition['sm
     requiredContent: ['Name', 'Contact method', 'Requested date', 'Consent language'],
     variants: ['short', 'detailed', 'multi-step'],
     dataSource: 'Configured WebKiln form definition',
+  },
+  'player-count': {
+    purpose: 'Show community capacity using configured or manually entered content.',
+    requiredContent: ['Current count label', 'Accessible status context', 'Last updated source'],
+    variants: ['compact', 'hero', 'status-card'],
+    dataSource: 'Approved status provider or manual content',
+  },
+  'knowledge-base': {
+    purpose: 'Guide customers to useful support resources without hiding the destination.',
+    requiredContent: ['Link labels', 'Destinations', 'Clear support heading'],
+    variants: ['list', 'cards', 'featured'],
+    dataSource: 'Optional CMS collection of support links',
+  },
+  'rental-catalog': {
+    purpose: 'Present rentable items with availability and useful decision details.',
+    requiredContent: ['Item name', 'Availability', 'Price or quote label'],
+    variants: ['cards', 'list', 'featured'],
+    dataSource: 'Optional CMS collection of rental items',
+  },
+  'package-builder': {
+    purpose: 'Help visitors assemble a package while keeping selections understandable.',
+    requiredContent: ['Option labels', 'Summary', 'Accessible total or next step'],
+    variants: ['steps', 'selects', 'cards'],
+    dataSource: 'Optional CMS collection of package options',
+  },
+  'floor-plan': {
+    purpose: 'Provide a visual floor-plan reference with an equivalent text description.',
+    requiredContent: ['Floor-plan asset', 'Accessible description', 'Legend when needed'],
+    variants: ['image', 'interactive-placeholder', 'split'],
+    dataSource: 'Existing asset reference',
   },
 };
 

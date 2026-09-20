@@ -85,6 +85,11 @@ describe('component registry', () => {
       'server-status',
       'venue-listing',
       'booking-request',
+      'player-count',
+      'knowledge-base',
+      'rental-catalog',
+      'package-builder',
+      'floor-plan',
     ]) {
       expect(getComponentDefinition(id)).toMatchObject({
         id,
