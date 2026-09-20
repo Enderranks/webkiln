@@ -656,16 +656,121 @@ app.get('/api/forms/:formId/submissions', async (c) => {
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Form not found');
   if (!roleAllows(row.membership.role, 'view'))
     return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
+  const status = c.req.query('status');
+  const query = (c.req.query('q') ?? '').trim().toLowerCase();
   const submissions = await getDb(c.env.DB)
     .select()
     .from(formSubmission)
     .where(eq(formSubmission.formId, row.form.id))
     .orderBy(desc(formSubmission.createdAt))
-    .limit(100)
+    .limit(200)
     .all();
+  const filtered = submissions.filter((submission) => {
+    const data = jsonValue(submission.data, {}) as Record<string, unknown>;
+    return (
+      (!status || submission.status === status) &&
+      (!query || JSON.stringify(data).toLowerCase().includes(query))
+    );
+  });
   return c.json(
-    submissions.map((submission) => ({ ...submission, data: jsonValue(submission.data, {}) })),
+    filtered.map((submission) => ({ ...submission, data: jsonValue(submission.data, {}) })),
   );
+});
+
+app.get('/api/forms/:formId/submissions/export', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, membership: workspaceMembership })
+    .from(formDefinition)
+    .innerJoin(workspaceMembership, eq(formDefinition.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(formDefinition.id, c.req.param('formId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row || !roleAllows(row.membership.role, 'view'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(formSubmission)
+    .where(eq(formSubmission.formId, row.form.id))
+    .orderBy(desc(formSubmission.createdAt))
+    .limit(200)
+    .all();
+  const dataRows = rows.map((item) => ({
+    createdAt: item.createdAt.toISOString(),
+    status: item.status,
+    data: jsonValue(item.data, {}) as Record<string, unknown>,
+  }));
+  const keys = [...new Set(dataRows.flatMap((item) => Object.keys(item.data)))];
+  const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    ['createdAt', 'status', ...keys].map(csvCell).join(','),
+    ...dataRows.map((item) =>
+      [item.createdAt, item.status, ...keys.map((key) => item.data[key])].map(csvCell).join(','),
+    ),
+  ].join('\n');
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${row.form.slug}-submissions.csv"`,
+    },
+  });
+});
+
+app.patch('/api/forms/:formId/submissions/:submissionId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, membership: workspaceMembership })
+    .from(formDefinition)
+    .innerJoin(workspaceMembership, eq(formDefinition.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(formDefinition.id, c.req.param('formId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row || !roleAllows(row.membership.role, 'content'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  const body = await c.req.json<{ status?: string }>();
+  if (!body.status || !['received', 'read', 'archived'].includes(body.status))
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'A valid submission status is required');
+  const updated = await getDb(c.env.DB)
+    .update(formSubmission)
+    .set({ status: body.status })
+    .where(
+      and(
+        eq(formSubmission.id, c.req.param('submissionId')),
+        eq(formSubmission.formId, row.form.id),
+      ),
+    )
+    .returning()
+    .get();
+  if (!updated) return jsonError(c, 404, 'NOT_FOUND', 'Submission not found');
+  return c.json({ ...updated, data: jsonValue(updated.data, {}) });
+});
+
+app.delete('/api/forms/:formId/submissions/:submissionId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, membership: workspaceMembership })
+    .from(formDefinition)
+    .innerJoin(workspaceMembership, eq(formDefinition.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(formDefinition.id, c.req.param('formId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row || !roleAllows(row.membership.role, 'content'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  await getDb(c.env.DB)
+    .delete(formSubmission)
+    .where(
+      and(
+        eq(formSubmission.id, c.req.param('submissionId')),
+        eq(formSubmission.formId, row.form.id),
+      ),
+    );
+  return c.body(null, 204);
 });
 
 app.post('/api/forms/:formId/submit', async (c) => {

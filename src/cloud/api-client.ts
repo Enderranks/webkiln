@@ -196,8 +196,30 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
       body: JSON.stringify({ name, fields }),
     });
   }
-  listSubmissions(formId: string): Promise<FormSubmission[]> {
-    return this.request(`/api/forms/${encodeURIComponent(formId)}/submissions`);
+  listSubmissions(formId: string, query = ''): Promise<FormSubmission[]> {
+    return this.request(
+      `/api/forms/${encodeURIComponent(formId)}/submissions${query ? `?${query}` : ''}`,
+    );
+  }
+  updateSubmission(formId: string, submissionId: string, status: string): Promise<FormSubmission> {
+    return this.request(
+      `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}`,
+      { method: 'PATCH', body: JSON.stringify({ status }) },
+    );
+  }
+  deleteSubmission(formId: string, submissionId: string): Promise<void> {
+    return this.request(
+      `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}`,
+      { method: 'DELETE' },
+    );
+  }
+  exportSubmissions(formId: string): Promise<string> {
+    return fetch(`${this.baseUrl}/api/forms/${encodeURIComponent(formId)}/submissions/export`, {
+      credentials: 'include',
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('Could not export submissions');
+      return response.text();
+    });
   }
   listAutomations(workspaceId: string): Promise<Automation[]> {
     return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/automations`);

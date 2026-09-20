@@ -1,5 +1,5 @@
 import type { WebKilnApiClient } from './api-client';
-import type { AssetMetadata, CloudSite, Session, Workspace } from './contracts';
+import type { AssetMetadata, CloudSite, FormSubmission, Session, Workspace } from './contracts';
 import { navigate } from './app-router';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { createMigrationBackup, previewLocalProject } from './local-import';
@@ -286,13 +286,84 @@ export async function renderDashboard(
           say(error instanceof Error ? error.message : 'Could not create form.');
         }
       });
+      const renderSubmissionPanel = (formId: string, submissions: FormSubmission[]) => {
+        const target = document.querySelector<HTMLElement>('[data-form-submissions]');
+        if (!target) return;
+        const draw = () => {
+          const query =
+            document
+              .querySelector<HTMLInputElement>('[data-submission-search]')
+              ?.value.toLowerCase() ?? '';
+          const status =
+            document.querySelector<HTMLSelectElement>('[data-submission-status]')?.value ?? '';
+          const filtered = submissions.filter((submission) => {
+            const matchesStatus = !status || submission.status === status;
+            const matchesQuery =
+              !query || JSON.stringify(submission.data).toLowerCase().includes(query);
+            return matchesStatus && matchesQuery;
+          });
+          target.querySelector<HTMLElement>('[data-submission-list]')!.innerHTML =
+            filtered
+              .map(
+                (submission) =>
+                  `<div class="record-row" data-submission-row="${esc(submission.id)}"><strong>${new Date(submission.createdAt).toLocaleString()}</strong><span class="status-chip ${submission.status === 'archived' ? '' : 'published'}">${esc(submission.status)}</span><small>${esc(Object.keys(submission.data).join(', '))}</small><button class="ghost-btn" type="button" data-submission-read="${esc(submission.id)}">${submission.status === 'read' ? 'Mark received' : 'Mark read'}</button><button class="ghost-btn danger-action" type="button" data-submission-delete="${esc(submission.id)}">Delete</button></div>`,
+              )
+              .join('') || empty('No matching submissions', 'Try another search or status filter.');
+          target.querySelectorAll<HTMLButtonElement>('[data-submission-read]').forEach((action) =>
+            action.addEventListener('click', async () => {
+              const submission = submissions.find(
+                (item) => item.id === action.dataset.submissionRead,
+              );
+              if (!submission) return;
+              const next = submission.status === 'read' ? 'received' : 'read';
+              try {
+                const updated = await cloud.updateSubmission(formId, submission.id, next);
+                Object.assign(submission, updated);
+                draw();
+              } catch (error) {
+                say(error instanceof Error ? error.message : 'Could not update submission.');
+              }
+            }),
+          );
+          target.querySelectorAll<HTMLButtonElement>('[data-submission-delete]').forEach((action) =>
+            action.addEventListener('click', async () => {
+              if (!window.confirm('Delete this submission?')) return;
+              try {
+                await cloud.deleteSubmission(formId, action.dataset.submissionDelete ?? '');
+                const index = submissions.findIndex(
+                  (item) => item.id === action.dataset.submissionDelete,
+                );
+                if (index >= 0) submissions.splice(index, 1);
+                draw();
+              } catch (error) {
+                say(error instanceof Error ? error.message : 'Could not delete submission.');
+              }
+            }),
+          );
+        };
+        target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><h2>Submissions</h2><span>${submissions.length} stored · latest 200</span></div><div class="submission-toolbar"><input type="search" data-submission-search placeholder="Search submissions" aria-label="Search submissions" /><select data-submission-status aria-label="Filter submissions"><option value="">All statuses</option><option value="received">Received</option><option value="read">Read</option><option value="archived">Archived</option></select><button class="ghost-btn" type="button" data-submission-export>Export CSV</button></div><div data-submission-list></div></section>`;
+        target.querySelector('[data-submission-search]')?.addEventListener('input', draw);
+        target.querySelector('[data-submission-status]')?.addEventListener('change', draw);
+        target.querySelector('[data-submission-export]')?.addEventListener('click', async () => {
+          try {
+            downloadFile(
+              'webkiln-submissions.csv',
+              await cloud.exportSubmissions(formId),
+              'text/csv',
+            );
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not export submissions.');
+          }
+        });
+        draw();
+      };
       document.querySelectorAll<HTMLButtonElement>('[data-submissions-form]').forEach((button) =>
         button.addEventListener('click', async () => {
           const target = document.querySelector<HTMLElement>('[data-form-submissions]');
           if (!target) return;
           try {
             const submissions = await cloud.listSubmissions(button.dataset.submissionsForm ?? '');
-            target.innerHTML = `<section class="dashboard-panel collection-records"><div class="panel-title"><h2>Submissions</h2><span>${submissions.length} stored · latest 100</span></div>${submissions.map((submission) => `<div class="record-row"><strong>${new Date(submission.createdAt).toLocaleString()}</strong><span class="status-chip published">${esc(submission.status)}</span><small>${esc(Object.keys(submission.data).join(', '))}</small></div>`).join('') || empty('No submissions', 'Submissions will appear after the published form receives data.')}</section>`;
+            renderSubmissionPanel(button.dataset.submissionsForm ?? '', submissions);
           } catch (error) {
             say(error instanceof Error ? error.message : 'Could not load submissions.');
           }

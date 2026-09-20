@@ -515,6 +515,25 @@
   color: var(--cloud-muted);
   font-size: 12px;
 }
+.submission-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.submission-toolbar input,
+.submission-toolbar select {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--cloud-line);
+  border-radius: 6px;
+  background: #111416;
+  color: var(--cloud-text);
+}
+.submission-toolbar input {
+  flex: 1;
+  min-width: 190px;
+}
 .website-toolbar label {
   display: grid;
   gap: 6px;
