@@ -31,6 +31,12 @@ describe('component registry', () => {
         'hosting-quote',
         'venue-listing',
         'booking-request',
+        'rich-text',
+        'video',
+        'grid',
+        'repeater',
+        'comparison',
+        'booking',
       ]),
     );
   });
