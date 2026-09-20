@@ -9,10 +9,12 @@ import {
   recordsToCsv,
 } from '../src/portability/export';
 import {
+  componentDefinitionToManifest,
   migrateComponentPackage,
   sanitizeComponentStyles,
   validateComponentPackage,
 } from '../src/components-sdk/sdk';
+import { getComponentDefinition } from '../src/components-registry/registry';
 
 describe('v21 portability and component SDK', () => {
   it('exports clean markup and strips editor/unsafe content', () => {
@@ -85,5 +87,25 @@ describe('v21 portability and component SDK', () => {
       '.x{color:red}',
     );
     expect(migrateComponentPackage(pkg, 2).manifest.version).toBe(2);
+  });
+
+  it('maps a WebKiln registry definition into a versioned SDK manifest', () => {
+    const definition = getComponentDefinition('booking-request');
+    expect(definition).toBeDefined();
+    const manifest = componentDefinitionToManifest(definition!);
+    expect(manifest).toMatchObject({
+      id: 'booking-request',
+      version: 1,
+      responsive: true,
+      accessibility: { minTouchTarget: 44 },
+    });
+    expect(
+      validateComponentPackage({
+        sdkVersion: 1,
+        manifest,
+        markup: definition!.defaultContent,
+        styles: '',
+      }),
+    ).toBe(true);
   });
 });

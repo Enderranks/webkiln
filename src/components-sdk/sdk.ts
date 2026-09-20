@@ -1,3 +1,5 @@
+import type { ComponentDefinition } from '../components-registry/registry';
+
 export const COMPONENT_SDK_VERSION = 1 as const;
 export interface ComponentManifest {
   id: string;
@@ -24,6 +26,43 @@ export interface ComponentPackage {
   markup: string;
   styles: string;
   migrations?: Record<string, { to: number }>;
+}
+export function componentDefinitionToManifest(definition: ComponentDefinition): ComponentManifest {
+  const typeMap: Record<string, ComponentManifest['editableFields'][number]['type']> = {
+    text: 'text',
+    number: 'number',
+    color: 'color',
+    url: 'url',
+    richtext: 'rich-text',
+    image: 'image',
+    select: 'text',
+  };
+  return {
+    id: definition.id,
+    version: definition.version,
+    displayName: definition.displayName,
+    icon: definition.icon,
+    preview: definition.preview,
+    editableFields: definition.inspectorSchema.map((field) => ({
+      name: field.key,
+      type: typeMap[field.type] ?? 'text',
+    })),
+    traits: definition.editableTraits,
+    allowedParents: definition.allowedParents,
+    allowedChildren: definition.allowedChildren,
+    responsive: definition.responsive,
+    accessibility: {
+      requiresLabel: definition.accessibilityRequirements.some((item) => /label/i.test(item)),
+      keyboard: definition.accessibilityRequirements.some((item) => /keyboard|focus/i.test(item)),
+      minTouchTarget: 44,
+    },
+    inspector: definition.inspectorSchema.map((field) => ({
+      group: 'WebKiln',
+      field: field.key,
+      control: field.type,
+    })),
+    defaultStyles: definition.defaultDesignTokens,
+  };
 }
 const safeIdentifier = /^[a-z][a-z0-9-]{1,63}$/;
 const unsafePackageContent =
