@@ -1,5 +1,5 @@
 import type { Component } from 'grapesjs';
-import { getComponentDefinition } from '../components-registry/registry';
+import { componentRegistry, getComponentDefinition } from '../components-registry/registry';
 import type { DeviceId, WebKilnProject } from '../types';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { WebKilnEditorAdapter } from './webkiln-editor-adapter';
@@ -285,6 +285,7 @@ export class WebKilnEditorController {
   }
 
   private bindBlocks(): void {
+    this.populateComponentCatalog();
     const search = document.querySelector<HTMLInputElement>('#blockSearch');
     search?.addEventListener('input', () => {
       const query = search.value.toLowerCase();
@@ -332,6 +333,39 @@ export class WebKilnEditorController {
       .forEach((row) =>
         row.addEventListener('click', () => this.addDefinition(row.dataset.component ?? 'heading')),
       );
+  }
+
+  private populateComponentCatalog(): void {
+    const catalog = document.querySelector<HTMLElement>('.component-groups');
+    if (!catalog) return;
+    const existing = new Set(
+      Array.from(catalog.querySelectorAll<HTMLElement>('[data-component]')).map(
+        (item) => item.dataset.component,
+      ),
+    );
+    const additions = componentRegistry.filter((definition) => !existing.has(definition.id));
+    if (!additions.length) return;
+    const heading = document.createElement('p');
+    heading.className = 'subheading registry-components-heading';
+    heading.textContent = 'Full catalog';
+    catalog.append(heading);
+    additions.forEach((definition) => {
+      const button = document.createElement('button');
+      button.className = 'component-row';
+      button.type = 'button';
+      button.dataset.component = definition.id;
+      button.title = definition.explanation ?? definition.displayName;
+      const icon = document.createElement('span');
+      icon.textContent = definition.icon;
+      const copy = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = definition.displayName;
+      const description = document.createElement('small');
+      description.textContent = definition.smartSection?.purpose ?? 'Responsive WebKiln component';
+      copy.append(name, description);
+      button.append(icon, copy);
+      catalog.append(button);
+    });
   }
 
   private bindAssets(): void {

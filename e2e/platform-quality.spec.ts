@@ -70,6 +70,15 @@ test.describe('WebKiln platform quality', () => {
     await expect(page.locator('[data-command="add-section"]')).toHaveCount(0);
   });
 
+  test('component catalog exposes registry-backed sections', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Component rail is desktop-only');
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.editorEngine === 'webkiln');
+    await page.locator('.rail-tab[data-panel="components"]').click();
+    await page.locator('#componentSearch').fill('package builder');
+    await expect(page.locator('[data-component="package-builder"]')).toBeVisible();
+  });
+
   test('keyboard shortcuts do not hijack text fields', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Editor rail is desktop-only');
     await page.goto('/');
