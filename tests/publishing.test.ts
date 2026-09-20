@@ -4,6 +4,7 @@ import {
   createPublishedSnapshot,
   extractProjectMarkup,
   publicHtml,
+  publicRobots,
 } from '../worker/src/publishing';
 
 describe('published site snapshots', () => {
@@ -157,5 +158,24 @@ describe('published site snapshots', () => {
     const html = publicHtml(snapshot, snapshot.pages[0], 'https://example.test');
     expect(html).toContain('<details class="wk-nav-drawer">');
     expect(html).not.toContain('<script');
+  });
+
+  it('generates robots controls from the published homepage SEO setting', () => {
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: { components: '<h1>Home</h1>' },
+        updatedAt: '',
+        isHomepage: true,
+        seo: { title: 'Home', description: '', robots: 'noindex,nofollow' },
+      },
+    ];
+    const snapshot = createPublishedSnapshot(project);
+    const robots = publicRobots(snapshot, 'https://example.test/sites/demo');
+    expect(robots).toContain('Disallow: /');
+    expect(robots).toContain('Sitemap: https://example.test/sites/demo/sitemap.xml');
   });
 });

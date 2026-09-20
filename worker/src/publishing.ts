@@ -139,7 +139,7 @@ export function createPublishedSnapshot(
           title: page.seo?.title || page.name,
           description: page.seo?.description || project.site.description,
           canonical: page.seo?.canonical,
-          robots: 'index,follow',
+          robots: page.seo?.robots || 'index,follow',
         },
         ...markup,
       };
@@ -249,6 +249,17 @@ export function publicHtml(
     page.seo.canonical || `${publicUrl}${page.slug === '/' ? '' : page.slug}`,
     page.seo.robots,
   );
+}
+
+export function publicRobots(snapshot: PublishedSnapshot, publicUrl: string): string {
+  const homepage = snapshot.pages.find((page) => page.homepage || page.slug === '/');
+  const noIndex = homepage?.seo.robots?.toLowerCase().includes('noindex') ?? false;
+  return [
+    'User-agent: *',
+    noIndex ? 'Disallow: /' : 'Allow: /',
+    `Sitemap: ${publicUrl}/sitemap.xml`,
+    '',
+  ].join('\n');
 }
 
 function pageShell(

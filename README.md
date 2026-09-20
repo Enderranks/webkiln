@@ -1,6 +1,6 @@
 # WebKiln editor
 
-WebKiln is a browser-based website editor with a custom editor shell and a typed GrapesJS model adapter.
+WebKiln is a browser-based website editor with a custom editor shell and a typed WebKiln editor adapter.
 
 ## Development
 
@@ -32,7 +32,7 @@ The cloud boundary includes typed auth/project/revision contracts, a credentials
 The cloud UI is available at `/login`, `/signup`, `/dashboard`, and `/editor/:siteId`. Dashboard workspace/site creation, local-project import confirmation, account navigation, cloud revision history, same-origin autosave, local recovery copies, and revision-conflict reload handling are implemented on top of the existing editor shell.
 
 - `src/main.ts` bootstraps the editor and keeps the existing shell behavior intact.
-- `src/editor/grapesjs-adapter.ts` owns the real GrapesJS dependency behind the `EditorAdapter` interface.
+- `src/editor/webkiln-editor-adapter.ts` owns the internal canvas engine behind the `EditorAdapter` interface. The dependency is an implementation detail and is not part of the WebKiln user experience or published sites.
 - `src/models/project-schema.ts` and `src/storage/project-storage.ts` provide versioned project persistence with legacy local-storage backup.
 - `src/components-registry/registry.ts` is the typed component-definition registry used by editor integrations.
 - `src/legacy/` contains the original version-6 interaction bridge while the visible canvas migration is staged.
@@ -40,7 +40,7 @@ The cloud UI is available at `/login`, `/signup`, `/dashboard`, and `/editor/:si
 
 ## Migration status
 
-The Vite/TypeScript foundation, structured project model, real GrapesJS adapter, visible GrapesJS canvas, WebKiln block bridge, nested selection, inspector controls, layers tree, page switching, responsive devices, preview mode, autosave, and recovery path are in place. The old version-6 scripts remain in `src/legacy/` only as rollback/reference material and are not imported by the active runtime.
+The Vite/TypeScript foundation, structured project model, WebKiln editor adapter, visible WebKiln canvas, block bridge, nested selection, inspector controls, layers tree, page switching, responsive devices, preview mode, autosave, and recovery path are in place. The old version-6 scripts remain in `src/legacy/` only as rollback/reference material and are not imported by the active runtime.
 
 Billing, ecommerce, collaboration, and a production custom-code execution service remain intentionally out of scope. Authentication and the hosted testing backend now exist behind the approved free-tier Cloudflare boundary. Custom code remains isolated in project data and is not evaluated by the editor.
 

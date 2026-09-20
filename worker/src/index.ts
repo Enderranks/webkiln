@@ -35,6 +35,7 @@ import {
   hashPassword,
   normalizeSlug,
   publicHtml,
+  publicRobots,
   formatPublicValue,
   type PublishedSnapshot,
 } from './publishing';
@@ -2116,6 +2117,18 @@ app.get('/sites/:siteSlug/sitemap.xml', async (c) => {
       },
     },
   );
+});
+
+app.get('/sites/:siteSlug/robots.txt', async (c) => {
+  const published = await getPublishedSite(c, c.req.param('siteSlug'));
+  if (!published) return new Response('Not found\n', { status: 404 });
+  const base = publicSiteUrl(c, published.site.slug);
+  return new Response(publicRobots(published.snapshot, base), {
+    headers: {
+      'Content-Type': 'text/plain; charset=UTF-8',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 });
 
 app.post('/sites/:siteSlug/__access', async (c) => {

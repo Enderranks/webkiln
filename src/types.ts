@@ -138,7 +138,7 @@ export interface PageDocument {
   parentId?: string;
   folder?: string;
   isHomepage?: boolean;
-  seo?: { title: string; description: string; canonical?: string };
+  seo?: { title: string; description: string; canonical?: string; robots?: string };
   settings?: { showInNavigation: boolean; passwordProtected: boolean };
   deletedAt?: string;
 }
