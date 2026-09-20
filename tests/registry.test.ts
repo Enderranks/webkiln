@@ -25,6 +25,12 @@ describe('component registry', () => {
         'team',
         'blog',
         'events',
+        'game-selector',
+        'game-plans',
+        'server-status',
+        'hosting-quote',
+        'venue-listing',
+        'booking-request',
       ]),
     );
   });
@@ -52,5 +58,25 @@ describe('component registry', () => {
       requiredContent: expect.arrayContaining(['Section heading']),
       variants: expect.arrayContaining(['cards']),
     });
+  });
+
+  it('registers ecosystem sections with safe responsive metadata', () => {
+    for (const id of [
+      'game-selector',
+      'game-plans',
+      'server-status',
+      'venue-listing',
+      'booking-request',
+    ]) {
+      expect(getComponentDefinition(id)).toMatchObject({
+        id,
+        responsive: true,
+        smartSection: {
+          purpose: expect.any(String),
+          requiredContent: expect.any(Array),
+          variants: expect.any(Array),
+        },
+      });
+    }
   });
 });

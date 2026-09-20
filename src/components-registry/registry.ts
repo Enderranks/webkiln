@@ -200,6 +200,96 @@ const definitions: Array<[string, string, ComponentDefinition['category'], strin
     'content',
     '<aside class="wk-announcement" role="status"><strong>Announcement</strong><span>Share a timely update.</span><button type="button" aria-label="Dismiss announcement">×</button></aside>',
   ],
+  [
+    'game-selector',
+    'Game selector',
+    'commerce',
+    '<section class="wk-smart-section wk-game-selector" data-wk-smart="game-selector"><h2>Choose your game</h2><label>Game<select><option>Minecraft</option><option>Palworld</option></select></label></section>',
+  ],
+  [
+    'game-plans',
+    'Game plans',
+    'commerce',
+    '<section class="wk-smart-section wk-game-plans" data-wk-smart="game-plans"><h2>Plans for every world</h2><div class="columns"><article><h3>Starter</h3><p>4 GB RAM · 10 players</p><a class="button" href="#">Choose plan</a></article><article><h3>Community</h3><p>8 GB RAM · 25 players</p><a class="button" href="#">Choose plan</a></article></div></section>',
+  ],
+  [
+    'ram-calculator',
+    'RAM calculator',
+    'commerce',
+    '<section class="wk-smart-section wk-ram-calculator" data-wk-smart="ram-calculator"><h2>Estimate your server</h2><label>Players<input type="number" min="1" value="10" /></label><p>Recommended: 4 GB RAM</p></section>',
+  ],
+  [
+    'server-location',
+    'Server location selector',
+    'commerce',
+    '<section class="wk-smart-section wk-server-location" data-wk-smart="server-location"><h2>Choose a location</h2><label>Region<select><option>North America</option><option>Europe</option><option>Asia Pacific</option></select></label></section>',
+  ],
+  [
+    'server-status',
+    'Server status',
+    'content',
+    '<section class="wk-smart-section wk-server-status" data-wk-smart="server-status" role="status"><h2>All systems operational</h2><p>Network and game services are responding normally.</p></section>',
+  ],
+  [
+    'network-status',
+    'Network status',
+    'content',
+    '<section class="wk-smart-section wk-network-status" data-wk-smart="network-status"><h2>Network status</h2><ul><li>North America <strong>Operational</strong></li><li>Europe <strong>Operational</strong></li></ul></section>',
+  ],
+  [
+    'modpack-showcase',
+    'Modpack showcase',
+    'media',
+    '<section class="wk-smart-section wk-modpack-showcase" data-wk-smart="modpack-showcase"><h2>Explore the modpack</h2><p>Showcase supported worlds, versions, and install instructions.</p></section>',
+  ],
+  [
+    'incident-banner',
+    'Incident banner',
+    'content',
+    '<aside class="wk-smart-section wk-incident-banner" data-wk-smart="incident-banner" role="alert"><strong>Service notice</strong><p>Share a clear update and expected resolution.</p></aside>',
+  ],
+  [
+    'hosting-quote',
+    'Custom hosting quote',
+    'forms',
+    '<section class="wk-smart-section wk-hosting-quote" data-wk-smart="hosting-quote"><h2>Need something custom?</h2><p>Tell us about your world and we will shape a hosting plan.</p><a class="button" href="#quote">Request a quote</a></section>',
+  ],
+  [
+    'venue-listing',
+    'Venue listing',
+    'content',
+    '<section class="wk-smart-section wk-venue-listing" data-wk-smart="venue-listing"><h2>Find your venue</h2><div class="columns"><article><h3>Venue name</h3><p>Capacity · Location · Availability</p></article></div></section>',
+  ],
+  [
+    'room-listing',
+    'Room listing',
+    'content',
+    '<section class="wk-smart-section wk-room-listing" data-wk-smart="room-listing"><h2>Rooms and spaces</h2><div class="columns"><article><h3>Room name</h3><p>Capacity · Layout · Rate</p></article></div></section>',
+  ],
+  [
+    'event-calendar',
+    'Event calendar',
+    'content',
+    '<section class="wk-smart-section wk-event-calendar" data-wk-smart="event-calendar"><h2>Upcoming events</h2><p>Date · Venue · Availability</p></section>',
+  ],
+  [
+    'availability',
+    'Availability',
+    'content',
+    '<section class="wk-smart-section wk-availability" data-wk-smart="availability"><h2>Check availability</h2><label>Date<input type="date" /></label><p>Available options appear here.</p></section>',
+  ],
+  [
+    'booking-request',
+    'Booking request',
+    'forms',
+    '<section class="wk-smart-section wk-booking-request" data-wk-smart="booking-request"><h2>Request a booking</h2><form><label>Name<input required /></label><label>Email<input type="email" required /></label><button type="submit">Send request</button></form></section>',
+  ],
+  [
+    'ticket-listing',
+    'Ticket listing',
+    'commerce',
+    '<section class="wk-smart-section wk-ticket-listing" data-wk-smart="ticket-listing"><h2>Tickets</h2><div class="columns"><article><h3>General admission</h3><p>From $25 · Available now</p></article></div></section>',
+  ],
 ];
 
 const SMART_SECTION_METADATA: Record<string, NonNullable<ComponentDefinition['smartSection']>> = {
@@ -248,6 +338,36 @@ const SMART_SECTION_METADATA: Record<string, NonNullable<ComponentDefinition['sm
     purpose: 'Set accurate visitor expectations for availability.',
     requiredContent: ['Day labels', 'Opening times', 'Timezone when relevant'],
     variants: ['table', 'stacked', 'compact'],
+  },
+  'game-selector': {
+    purpose: 'Help visitors select a game before choosing a compatible hosting plan.',
+    requiredContent: ['Game name', 'Accessible selector label', 'Supported games'],
+    variants: ['select', 'cards', 'featured'],
+    dataSource: 'Optional CMS collection of games',
+  },
+  'game-plans': {
+    purpose: 'Present hosting plans with capacity and game-specific details.',
+    requiredContent: ['Plan name', 'RAM', 'Player capacity', 'Call to action'],
+    variants: ['cards', 'comparison', 'stacked'],
+    dataSource: 'Optional CMS collection of hosting plans',
+  },
+  'server-status': {
+    purpose: 'Communicate infrastructure health without inventing live measurements.',
+    requiredContent: ['Status label', 'Affected service or region', 'Last updated source'],
+    variants: ['summary', 'services', 'incident'],
+    dataSource: 'Configured status provider or manual content',
+  },
+  'venue-listing': {
+    purpose: 'Help visitors compare venues by capacity, location, and availability.',
+    requiredContent: ['Venue name', 'Location', 'Capacity', 'Accessible image text'],
+    variants: ['cards', 'list', 'map-placeholder'],
+    dataSource: 'Optional CMS collection of venues',
+  },
+  'booking-request': {
+    purpose: 'Collect a structured booking request with accessible form fields.',
+    requiredContent: ['Name', 'Contact method', 'Requested date', 'Consent language'],
+    variants: ['short', 'detailed', 'multi-step'],
+    dataSource: 'Configured WebKiln form definition',
   },
 };
 
