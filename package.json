@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:cloud": "node scripts/build-cloud.mjs",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.js",
     "type-check": "tsc --noEmit",
@@ -18,7 +19,7 @@
     "worker:check": "wrangler deploy --dry-run --config wrangler.jsonc",
     "d1:migrate:local": "wrangler d1 migrations apply webkiln-v10-dev --local --config wrangler.jsonc",
     "d1:migrate:remote": "wrangler d1 migrations apply webkiln-v10-dev --remote --config wrangler.jsonc",
-    "worker:deploy": "wrangler deploy --config wrangler.jsonc"
+    "worker:deploy": "npm run build:cloud && wrangler deploy --config wrangler.jsonc"
   },
   "dependencies": {
     "better-auth": "^1.7.5",
