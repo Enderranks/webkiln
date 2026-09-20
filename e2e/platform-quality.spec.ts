@@ -87,6 +87,14 @@ test.describe('WebKiln platform quality', () => {
     await expect(page.locator('#toast strong')).toHaveText(/Share link/);
   });
 
+  test('health control opens calculated Site Health Center', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Health toolbar control is desktop-only');
+    await page.goto('/');
+    await page.locator('#healthBtn').click();
+    await expect(page.locator('#sitePanel')).toHaveClass(/active/);
+    await expect(page.locator('[data-v14-results]')).toContainText('Site Health Center');
+  });
+
   test('custom code tabs preserve isolated HTML, CSS, and JavaScript drafts', async ({
     page,
     isMobile,

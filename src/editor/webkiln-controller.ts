@@ -119,6 +119,10 @@ export class WebKilnEditorController {
         'Select a section to edit it, or press Ctrl / Cmd + K to open commands.',
       );
     });
+    document.querySelector('#healthBtn')?.addEventListener('click', () => {
+      document.querySelector<HTMLButtonElement>('.rail-tab[data-panel="site"]')?.click();
+      document.querySelector<HTMLButtonElement>('[data-run-health]')?.click();
+    });
     document.querySelector('#deleteBtn')?.addEventListener('click', () => this.deleteSelected());
     document
       .querySelector('.outline-btn')
