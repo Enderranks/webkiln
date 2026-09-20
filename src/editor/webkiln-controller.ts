@@ -968,7 +968,14 @@ export class WebKilnEditorController {
     const remove = document.createElement('button');
     remove.textContent = 'Delete';
     remove.onclick = () => this.deleteSelected();
-    actions.append(duplicate, remove);
+    const wrap = document.createElement('button');
+    wrap.textContent = 'Wrap in container';
+    wrap.onclick = () => this.wrapSelected();
+    const detach = document.createElement('button');
+    detach.textContent = 'Detach';
+    detach.disabled = !this.isLayoutContainer(this.selected?.parent());
+    detach.onclick = () => this.detachSelected();
+    actions.append(duplicate, wrap, detach, remove);
     host.append(actions);
     const lock = document.createElement('button');
     lock.className = 'mini-btn';
@@ -1100,6 +1107,50 @@ export class WebKilnEditorController {
     this.adapter.deleteComponent(this.selected);
     this.selected = null;
     this.renderLayers();
+  }
+
+  private isLayoutContainer(component: Component | null | undefined): boolean {
+    const classes = String(
+      (component?.getAttributes() as Record<string, unknown> | undefined)?.class ?? '',
+    ).split(/\s+/);
+    return classes.includes('wk-layout-container');
+  }
+
+  private wrapSelected(): void {
+    const selected = this.selected;
+    const parent = selected?.parent();
+    if (!selected || !parent || this.isProtected(selected) || parent === this.adapter.getRoot()) {
+      return;
+    }
+    const wrapper = parent.append({
+      tagName: 'div',
+      attributes: { class: 'wk-layout-container' },
+    })[0];
+    if (!wrapper) return;
+    selected.move(wrapper, { at: 0 });
+    this.adapter.selectComponent(wrapper);
+    this.renderLayers();
+    this.renderDynamicInspector('content');
+    this.scheduleSave('Element wrapped');
+    this.toast('Container added', 'The selected element is now inside a layout container.');
+  }
+
+  private detachSelected(): void {
+    const selected = this.selected;
+    const parent = selected?.parent();
+    const grandparent = parent?.parent();
+    if (!selected || !parent || !grandparent || !this.isLayoutContainer(parent)) return;
+    const index = parent.components().models.indexOf(selected);
+    selected.move(grandparent, { at: Math.max(0, index) });
+    if (parent.components().length === 0) parent.remove();
+    this.adapter.selectComponent(selected);
+    this.renderLayers();
+    this.renderDynamicInspector('content');
+    this.scheduleSave('Element detached');
+    this.toast(
+      'Container removed',
+      'The element remains on the canvas with its content preserved.',
+    );
   }
 
   private setDevice(device: DeviceId): void {
