@@ -78,6 +78,14 @@ test.describe('WebKiln platform quality', () => {
     await expect(page.locator('#commandPalette')).toBeHidden();
   });
 
+  test('share control provides the current editor link', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Top toolbar share control is desktop-only');
+    await page.goto('/');
+    await page.locator('#shareBtn').click();
+    await expect(page.locator('#toast')).toBeVisible();
+    await expect(page.locator('#toast strong')).toHaveText(/Share link/);
+  });
+
   test('custom code tabs preserve isolated HTML, CSS, and JavaScript drafts', async ({
     page,
     isMobile,

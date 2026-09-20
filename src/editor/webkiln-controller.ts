@@ -124,6 +124,22 @@ export class WebKilnEditorController {
       .querySelector('.outline-btn')
       ?.addEventListener('click', () => this.duplicateSelected());
     document.querySelector('#previewBtn')?.addEventListener('click', () => this.togglePreview());
+    document.querySelector('#shareBtn')?.addEventListener('click', () => {
+      const url = window.location.href;
+      const copy = navigator.clipboard?.writeText(url);
+      if (copy) {
+        void copy
+          .then(() =>
+            this.toast(
+              'Share link copied',
+              'The current WebKiln editor link is on your clipboard.',
+            ),
+          )
+          .catch(() => this.toast('Share link ready', url));
+      } else {
+        this.toast('Share link ready', url);
+      }
+    });
     document
       .querySelector('#publishBtn')
       ?.addEventListener('click', () => this.saveNow('Published checkpoint'));
