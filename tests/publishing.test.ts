@@ -178,4 +178,60 @@ describe('published site snapshots', () => {
     expect(robots).toContain('Disallow: /');
     expect(robots).toContain('Sitemap: https://example.test/sites/demo/sitemap.xml');
   });
+
+  it('publishes only allowlisted interactions through the fixed runtime contract', () => {
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: {
+          components:
+            '<button data-wk-id="hero-cta">Start</button><div data-wk-id="panel">Panel</div>',
+        },
+        updatedAt: '',
+        isHomepage: true,
+        seo: { title: 'Home', description: '' },
+        settings: { showInNavigation: true, passwordProtected: false },
+      },
+    ];
+    project.editorSettings!.interactions = [
+      {
+        id: 'interaction-1',
+        name: 'Reveal panel',
+        trigger: 'click',
+        target: '[data-wk-id="hero-cta"]',
+        actions: [
+          {
+            id: 'action-1',
+            type: 'show',
+            target: '[data-wk-id="panel"]',
+            duration: 200,
+            delay: 0,
+            easing: 'ease-out',
+          },
+          {
+            id: 'unsafe-action',
+            type: 'counter',
+            target: '[data-wk-id="panel"]',
+            duration: 200,
+            delay: 0,
+            easing: 'ease-out',
+          },
+        ],
+        sequence: 'sequence',
+        loop: { enabled: false, delay: 0 },
+        enabled: true,
+      },
+    ];
+    const snapshot = createPublishedSnapshot(project);
+    const html = publicHtml(snapshot, snapshot.pages[0], 'https://example.test/sites/demo');
+    expect(snapshot.interactions).toHaveLength(1);
+    expect(snapshot.interactions?.[0].actions).toHaveLength(1);
+    expect(html).toContain('webkiln-interactions');
+    expect(html).toContain('/webkiln-runtime.js');
+    expect(html).toContain('data-webkiln-id="hero-cta"');
+    expect(html).not.toContain('data-wk-id');
+  });
 });

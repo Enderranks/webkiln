@@ -33,6 +33,12 @@ export interface PublishedSnapshot {
   pages: PublishedPage[];
   menus?: PublishedMenu[];
   custom404?: PublishedPage;
+  interactions?: Array<{
+    trigger: string;
+    target: string;
+    actions: Array<{ type: string; value?: string | number; duration?: number; delay?: number }>;
+    scrollPosition?: number;
+  }>;
   publishedAt: string;
 }
 
@@ -42,6 +48,11 @@ const EVENT_ATTR = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
 export function sanitizeHtml(input: string): string {
   return input
+    .replace(
+      /\s+data-wk-id\s*=\s*(?:"([^"]*)"|'([^']*)')/gi,
+      (_match, doubleValue, singleValue) =>
+        ' data-webkiln-id="' + escapeAttribute(String(doubleValue ?? singleValue ?? '')) + '"',
+    )
     .replace(BLOCKED_TAGS, '')
     .replace(EVENT_ATTR, '')
     .replace(/\s+(?:data-gjs-[\w:-]+|gjs-[\w:-]+)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
@@ -151,12 +162,47 @@ export function createPublishedSnapshot(
     mobileMode: menu.mobileMode,
     items: publishMenuItems(menu.items, pages),
   }));
+  const interactions = (project.editorSettings?.interactions ?? [])
+    .filter((item) => item.enabled && typeof item.target === 'string' && item.target.length <= 240)
+    .map((item) => ({
+      trigger: item.trigger,
+      target: item.target.replace(/\[data-wk-id([=~|^$*])?/gi, '[data-webkiln-id$1'),
+      actions: item.actions
+        .filter((action) =>
+          [
+            'show',
+            'hide',
+            'toggle-class',
+            'open-modal',
+            'open-drawer',
+            'expand-accordion',
+            'scroll-to',
+            'opacity',
+            'translate',
+            'scale',
+            'rotate',
+            'color',
+          ].includes(action.type),
+        )
+        .slice(0, 10)
+        .map((action) => ({
+          type: action.type,
+          ...(typeof action.value === 'string' || typeof action.value === 'number'
+            ? { value: action.value }
+            : {}),
+          duration: Math.max(0, Math.min(10000, Number(action.duration) || 0)),
+          delay: Math.max(0, Math.min(10000, Number(action.delay) || 0)),
+        })),
+      ...(typeof item.scrollPosition === 'number' ? { scrollPosition: item.scrollPosition } : {}),
+    }))
+    .filter((item) => item.actions.length);
   return {
     schemaVersion: project.schemaVersion,
     site: { title: project.site.title, description: project.site.description },
     pages,
     ...(menus?.length ? { menus } : {}),
     custom404,
+    ...(interactions.length ? { interactions } : {}),
     publishedAt,
   };
 }
@@ -241,6 +287,9 @@ export function publicHtml(
       ? `<details class="wk-nav-drawer"><summary>Menu</summary><nav class="${navigationClass}">${navigation}</nav></details>`
       : `<nav class="${navigationClass}">${navigation}</nav>`;
   const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a>${navigationMarkup}</header><main>${page.html}</main>`;
+  const runtime = snapshot.interactions?.length
+    ? `<script type="application/json" id="webkiln-interactions">${JSON.stringify(snapshot.interactions).replace(/</g, '\\u003c')}</script><script src="/webkiln-runtime.js" defer></script>`
+    : '';
   return pageShell(
     page.seo.title || snapshot.site.title,
     page.seo.description || snapshot.site.description,
@@ -248,6 +297,7 @@ export function publicHtml(
     page.css,
     page.seo.canonical || `${publicUrl}${page.slug === '/' ? '' : page.slug}`,
     page.seo.robots,
+    runtime,
   );
 }
 
@@ -269,11 +319,12 @@ function pageShell(
   css: string,
   canonical: string,
   robots = 'index,follow',
+  runtime = '',
 ): string {
   const safeTitle = escapeText(title);
   const safeDescription = escapeAttribute(description);
   const safeCanonical = escapeAttribute(canonical);
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><meta name="description" content="${safeDescription}"><meta name="robots" content="${escapeAttribute(robots)}"><link rel="canonical" href="${safeCanonical}"><meta property="og:title" content="${safeTitle}"><meta property="og:description" content="${safeDescription}"><meta property="og:url" content="${safeCanonical}"><style>${css}</style><style>body{margin:0}.wk-header{display:flex;justify-content:space-between;gap:24px;padding:18px 6%;align-items:center}.wk-header a{color:inherit;text-decoration:none}.wk-nav ul{display:flex;gap:18px;list-style:none;margin:0;padding:0}.wk-nav li{position:relative}.wk-nav li ul{display:grid;gap:8px;position:absolute;top:100%;left:0;min-width:160px;padding:12px;background:#111;border:1px solid #333}.wk-nav-scroll{overflow-x:auto}.wk-nav-scroll ul{width:max-content}.wk-nav-drawer{display:none}.wk-nav-drawer summary{cursor:pointer;list-style:none}.wk-nav-drawer summary::-webkit-details-marker{display:none}.wk-password,.wk-not-found{max-width:640px;margin:15vh auto;padding:24px;font-family:system-ui,sans-serif}.wk-password form{display:flex;gap:8px}.wk-password input,.wk-password button{padding:10px}@media(max-width:700px){.wk-header{align-items:flex-start}.wk-nav-stack ul{display:grid;gap:10px}.wk-nav-stack li ul{position:static;margin-top:8px}.wk-nav-drawer{display:block}.wk-nav-drawer .wk-nav{margin-top:12px}.wk-nav-drawer .wk-nav ul{display:grid;gap:10px}.wk-nav-drawer .wk-nav li ul{position:static;margin-top:8px}}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title><meta name="description" content="${safeDescription}"><meta name="robots" content="${escapeAttribute(robots)}"><link rel="canonical" href="${safeCanonical}"><meta property="og:title" content="${safeTitle}"><meta property="og:description" content="${safeDescription}"><meta property="og:url" content="${safeCanonical}"><style>${css}</style><style>body{margin:0}.wk-header{display:flex;justify-content:space-between;gap:24px;padding:18px 6%;align-items:center}.wk-header a{color:inherit;text-decoration:none}.wk-nav ul{display:flex;gap:18px;list-style:none;margin:0;padding:0}.wk-nav li{position:relative}.wk-nav li ul{display:grid;gap:8px;position:absolute;top:100%;left:0;min-width:160px;padding:12px;background:#111;border:1px solid #333}.wk-nav-scroll{overflow-x:auto}.wk-nav-scroll ul{width:max-content}.wk-nav-drawer{display:none}.wk-nav-drawer summary{cursor:pointer;list-style:none}.wk-nav-drawer summary::-webkit-details-marker{display:none}.wk-password,.wk-not-found{max-width:640px;margin:15vh auto;padding:24px;font-family:system-ui,sans-serif}.wk-password form{display:flex;gap:8px}.wk-password input,.wk-password button{padding:10px}@media(max-width:700px){.wk-header{align-items:flex-start}.wk-nav-stack ul{display:grid;gap:10px}.wk-nav-stack li ul{position:static;margin-top:8px}.wk-nav-drawer{display:block}.wk-nav-drawer .wk-nav{margin-top:12px}.wk-nav-drawer .wk-nav ul{display:grid;gap:10px}.wk-nav-drawer .wk-nav li ul{position:static;margin-top:8px}}</style></head><body>${body}${runtime}</body></html>`;
 }
 function escapeText(value: string): string {
   return value.replace(
@@ -284,4 +335,10 @@ function escapeText(value: string): string {
 }
 function escapeAttribute(value: string): string {
   return escapeText(value);
+}
+
+const PUBLIC_INTERACTION_RUNTIME = `(()=>{const d=document,e=d.getElementById("webkiln-interactions");if(!e)return;let xs=[];try{xs=JSON.parse(e.textContent||"[]")}catch{return}const q=s=>{try{return d.querySelector(s)}catch{return null}},reduced=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;const run=x=>{const el=q(x.target);if(!el)return;for(const a of x.actions||[]){const t=reduced()?0:(a.duration||0),v=a.value;switch(a.type){case"show":el.hidden=false;break;case"hide":el.hidden=true;break;case"toggle-class":if(typeof v==="string")el.classList.toggle(v);break;case"open-modal":case"open-drawer":el.hidden=false;el.setAttribute("aria-hidden","false");el.setAttribute("data-wk-open","true");break;case"expand-accordion":if("open"in el)el.open=true;el.setAttribute("aria-expanded","true");break;case"scroll-to":el.scrollIntoView({behavior:reduced()?"auto":"smooth"});break;case"opacity":el.style.transition="all "+t+"ms ease";el.style.opacity=String(v??1);break;case"translate":el.style.transition="all "+t+"ms ease";el.style.transform="translate("+String(v||"0,0")+")";break;case"scale":el.style.transition="all "+t+"ms ease";el.style.transform="scale("+String(v??1)+")";break;case"rotate":el.style.transition="all "+t+"ms ease";el.style.transform="rotate("+String(v||"0deg")+")";break;case"color":el.style.transition="color "+t+"ms ease";el.style.color=String(v||"")}}};xs.forEach(x=>{const el=q(x.target);if(!el)return;const fire=()=>setTimeout(()=>run(x),Math.min(10000,Math.max(0,(x.actions||[])[0]?.delay||0)));if(x.trigger==="page-load")fire();if(x.trigger==="click")el.addEventListener("click",fire);if(x.trigger==="hover")el.addEventListener("pointerenter",fire);if(x.trigger==="focus")el.addEventListener("focus",fire);if(x.trigger==="scroll-position")addEventListener("scroll",()=>{if(scrollY>=(x.scrollPosition||100))fire()},{passive:true})})})();`;
+
+export function publicInteractionRuntime(): string {
+  return PUBLIC_INTERACTION_RUNTIME;
 }

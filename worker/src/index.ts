@@ -36,6 +36,7 @@ import {
   normalizeSlug,
   publicHtml,
   publicRobots,
+  publicInteractionRuntime,
   formatPublicValue,
   type PublishedSnapshot,
 } from './publishing';
@@ -479,6 +480,19 @@ app.all('/api/auth/*', async (c) => {
   return getAuth(c.env).handler(c.req.raw);
 });
 app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT, database: 'd1' }));
+
+app.get(
+  '/webkiln-runtime.js',
+  () =>
+    new Response(publicInteractionRuntime(), {
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=300',
+        'Content-Security-Policy': "default-src 'none'; script-src 'self'",
+        'X-Content-Type-Options': 'nosniff',
+      },
+    }),
+);
 
 app.get('/api/workspaces', async (c) => {
   const user = await currentUser(c);
@@ -2379,7 +2393,12 @@ async function renderPublicPage(
     publicSiteUrl(c, published.site.slug),
     Boolean(published.published.passwordHash) && !hasAccess,
   );
-  return publicHtmlResponse(c, html, foundPage ? 200 : 404);
+  return publicHtmlResponse(
+    c,
+    html,
+    foundPage ? 200 : 404,
+    Boolean(foundPage && hasAccess && published.snapshot.interactions?.length),
+  );
 }
 
 async function publicCollectionContext(c: Context<{ Bindings: Env }>, siteSlug: string) {
@@ -2563,11 +2582,12 @@ function publicHtmlResponse(
   c: Context<{ Bindings: Env }>,
   html: string,
   status: 200 | 403 | 404,
+  interactive = false,
 ): Response {
   const response = c.html(html, status);
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'",
+    `${interactive ? "default-src 'self'; script-src 'self'" : "default-src 'self'; script-src 'none'"}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'`,
   );
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
