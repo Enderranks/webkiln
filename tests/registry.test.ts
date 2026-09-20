@@ -19,6 +19,12 @@ describe('component registry', () => {
         'container',
         'spacer',
         'divider',
+        'features',
+        'services',
+        'testimonials',
+        'team',
+        'blog',
+        'events',
       ]),
     );
   });

@@ -93,6 +93,48 @@ const definitions: Array<[string, string, ComponentDefinition['category'], strin
     '<footer class="inserted section-block"><h3>UNDERLINE</h3><p>Links and legal details.</p></footer>',
   ],
   [
+    'features',
+    'Feature grid',
+    'content',
+    '<section class="wk-smart-section wk-features" data-wk-smart="features"><p class="overline">WHY CHOOSE US</p><h2>Everything you need to move forward.</h2><div class="columns"><article><h3>Clear by design</h3><p>Explain the first benefit in a sentence.</p></article><article><h3>Made to adapt</h3><p>Show how your work meets people where they are.</p></article><article><h3>Ready to grow</h3><p>Give visitors a reason to take the next step.</p></article></div></section>',
+  ],
+  [
+    'services',
+    'Services',
+    'content',
+    '<section class="wk-smart-section wk-services" data-wk-smart="services"><h2>What we do</h2><div class="columns"><article><h3>Service one</h3><p>Describe the outcome clearly.</p></article><article><h3>Service two</h3><p>Describe the value in plain language.</p></article></div></section>',
+  ],
+  [
+    'testimonials',
+    'Testimonials',
+    'content',
+    '<section class="wk-smart-section wk-testimonials" data-wk-smart="testimonials"><h2>Kind words from good people.</h2><blockquote>“A thoughtful experience from first click to last.”</blockquote><p>Customer name · Role</p></section>',
+  ],
+  [
+    'team',
+    'Team',
+    'content',
+    '<section class="wk-smart-section wk-team" data-wk-smart="team"><h2>Meet the team</h2><div class="columns"><article><h3>Team member</h3><p>Role and a short introduction.</p></article><article><h3>Team member</h3><p>Role and a short introduction.</p></article></div></section>',
+  ],
+  [
+    'blog',
+    'Blog listing',
+    'content',
+    '<section class="wk-smart-section wk-blog" data-wk-smart="blog"><h2>Latest thinking</h2><div class="columns"><article><h3>Article title</h3><p>Summary and a link to the full story.</p></article><article><h3>Article title</h3><p>Summary and a link to the full story.</p></article></div></section>',
+  ],
+  [
+    'events',
+    'Events',
+    'content',
+    '<section class="wk-smart-section wk-events" data-wk-smart="events"><h2>Upcoming events</h2><article><h3>Event title</h3><p>Date · Venue · Availability</p><a class="button" href="#">Learn more</a></article></section>',
+  ],
+  [
+    'business-hours',
+    'Business hours',
+    'content',
+    '<section class="wk-smart-section wk-business-hours" data-wk-smart="business-hours"><h2>When to find us</h2><dl><dt>Monday–Friday</dt><dd>9:00 AM–5:00 PM</dd><dt>Saturday–Sunday</dt><dd>Closed</dd></dl></section>',
+  ],
+  [
     'tabs',
     'Tabs',
     'content',
