@@ -81,6 +81,7 @@ test.describe('WebKiln platform quality', () => {
   test('share control provides the current editor link', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Top toolbar share control is desktop-only');
     await page.goto('/');
+    await page.locator('#toast').evaluate((toast) => toast.setAttribute('hidden', ''));
     await page.locator('#shareBtn').click();
     await expect(page.locator('#toast')).toBeVisible();
     await expect(page.locator('#toast strong')).toHaveText(/Share link/);
