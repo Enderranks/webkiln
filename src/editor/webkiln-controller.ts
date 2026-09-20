@@ -1058,7 +1058,10 @@ export class WebKilnEditorController {
   }
 
   private handleShortcut(event: KeyboardEvent): void {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    const typing =
+      ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '') ||
+      document.activeElement?.getAttribute('contenteditable') === 'true';
+    if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       this.openCommandPalette();
       return;
@@ -1067,13 +1070,10 @@ export class WebKilnEditorController {
       this.closeCommandPalette();
       return;
     }
-    const typing =
-      ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '') ||
-      document.activeElement?.getAttribute('contenteditable') === 'true';
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
       this.saveNow('Manual save');
-    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+    } else if (!typing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       this.adapter.undo();
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c' && !typing) {

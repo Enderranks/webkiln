@@ -69,6 +69,15 @@ test.describe('WebKiln platform quality', () => {
     await expect(page.locator('[data-command="add-section"]')).toHaveCount(0);
   });
 
+  test('keyboard shortcuts do not hijack text fields', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Editor rail is desktop-only');
+    await page.goto('/');
+    const search = page.locator('#blockSearch');
+    await search.focus();
+    await page.keyboard.press('Control+KeyK');
+    await expect(page.locator('#commandPalette')).toBeHidden();
+  });
+
   test('custom code tabs preserve isolated HTML, CSS, and JavaScript drafts', async ({
     page,
     isMobile,
