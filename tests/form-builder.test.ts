@@ -18,4 +18,35 @@ describe('visual form builder validation', () => {
     expect(validateFormFields([base, { ...base, id: 'field-2' }])).toContain('used more than once');
     expect(validateFormFields([{ ...base, type: 'select' }])).toContain('at least one option');
   });
+
+  it('validates multi-step conditional fields against known controls', () => {
+    expect(
+      validateFormFields([
+        { ...base, name: 'kind' },
+        {
+          id: 'field-2',
+          name: 'company',
+          type: 'text',
+          label: 'Company',
+          required: true,
+          step: 2,
+          conditional: { field: 'kind', equals: 'business' },
+        },
+      ]),
+    ).toBeNull();
+    expect(
+      validateFormFields([
+        { ...base, name: 'kind' },
+        {
+          id: 'field-2',
+          name: 'company',
+          type: 'text',
+          label: 'Company',
+          required: true,
+          step: 2,
+          conditional: { field: 'missing', equals: 'business' },
+        },
+      ]),
+    ).toContain('does not exist');
+  });
 });

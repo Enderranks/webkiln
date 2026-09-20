@@ -295,11 +295,17 @@ function validateFormPayload(
     required?: boolean;
     options?: string[];
     validation?: Record<string, unknown>;
+    conditional?: { field?: string; equals?: string };
   }>,
   data: Record<string, unknown>,
 ) {
   for (const field of fields) {
     const value = data[field.name ?? ''];
+    if (
+      field.conditional?.field &&
+      String(data[field.conditional.field] ?? '') !== String(field.conditional.equals ?? '')
+    )
+      continue;
     if (field.required && (value === undefined || value === null || value === ''))
       return `${field.name} is required`;
     if (value === undefined || value === null || value === '') continue;
@@ -669,6 +675,7 @@ app.post('/api/sites/:siteId/forms', async (c) => {
       options?: string[];
       validation?: Record<string, unknown>;
       conditional?: { field: string; equals: string };
+      step?: number;
     }>;
     settings?: Record<string, unknown>;
   }>();
@@ -683,6 +690,23 @@ app.post('/api/sites/:siteId/forms', async (c) => {
   const ids = fields.map((field) => field.name!);
   if (new Set(ids).size !== ids.length)
     return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field names must be unique');
+  const fieldNames = new Set(ids);
+  if (
+    fields.some(
+      (field) =>
+        field.step !== undefined &&
+        (!Number.isInteger(field.step) || field.step < 1 || field.step > 20),
+    ) ||
+    fields.some(
+      (field) =>
+        field.conditional &&
+        (!field.conditional.field ||
+          !field.conditional.equals ||
+          field.conditional.field === field.name ||
+          !fieldNames.has(field.conditional.field ?? '')),
+    )
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field steps and conditions are invalid');
   const id = crypto.randomUUID();
   const now = new Date();
   const slug = `${name
@@ -707,6 +731,7 @@ app.post('/api/sites/:siteId/forms', async (c) => {
           options: field.options ?? [],
           validation: field.validation ?? {},
           conditional: field.conditional,
+          step: Number.isInteger(field.step) ? field.step : 1,
         })),
       ),
       settings: JSON.stringify({
@@ -753,12 +778,25 @@ app.patch('/api/forms/:formId', async (c) => {
       options?: string[];
       validation?: Record<string, unknown>;
       conditional?: { field: string; equals: string };
+      step?: number;
     }>;
     settings?: Record<string, unknown>;
     status?: 'active' | 'archived';
   }>();
   const name = body.name?.trim() || row.form.name;
-  const fields = body.fields ?? (jsonValue(row.form.fields, []) as Array<Record<string, unknown>>);
+  const fields =
+    body.fields ??
+    (jsonValue(row.form.fields, []) as Array<{
+      id?: string;
+      name?: string;
+      type?: string;
+      label?: string;
+      required?: boolean;
+      options?: string[];
+      validation?: Record<string, unknown>;
+      conditional?: { field?: string; equals?: string };
+      step?: number;
+    }>);
   if (
     fields.length > 100 ||
     fields.some((field) => !field.name || !formFieldTypes.has(String(field.type ?? '')))
@@ -767,6 +805,23 @@ app.patch('/api/forms/:formId', async (c) => {
   const ids = fields.map((field) => String(field.name));
   if (new Set(ids).size !== ids.length)
     return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field names must be unique');
+  const fieldNames = new Set(ids);
+  if (
+    fields.some(
+      (field) =>
+        field.step !== undefined &&
+        (!Number.isInteger(field.step) || Number(field.step) < 1 || Number(field.step) > 20),
+    ) ||
+    fields.some(
+      (field) =>
+        field.conditional &&
+        (!String(field.conditional.field ?? '').trim() ||
+          !String(field.conditional.equals ?? '').trim() ||
+          field.conditional.field === field.name ||
+          !fieldNames.has(field.conditional.field ?? '')),
+    )
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field steps and conditions are invalid');
   const now = new Date();
   await getDb(c.env.DB)
     .update(formDefinition)
@@ -782,6 +837,7 @@ app.patch('/api/forms/:formId', async (c) => {
           options: field.options ?? [],
           validation: field.validation ?? {},
           conditional: field.conditional,
+          step: Number.isInteger(field.step) ? field.step : 1,
         })),
       ),
       settings: JSON.stringify({ ...jsonValue(row.form.settings, {}), ...(body.settings ?? {}) }),
@@ -960,6 +1016,7 @@ app.post('/api/forms/:formId/submit', async (c) => {
     required?: boolean;
     options?: string[];
     validation?: Record<string, unknown>;
+    conditional?: { field?: string; equals?: string };
   }>;
   const validation = validateFormPayload(fields, body);
   if (validation) return jsonError(c, 400, 'VALIDATION_ERROR', validation);

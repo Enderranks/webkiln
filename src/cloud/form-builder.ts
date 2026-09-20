@@ -28,6 +28,19 @@ export function validateFormFields(fields: Array<Partial<FormField>>): string | 
       return `Field "${field.name}" has an unsupported type.`;
     if (['select', 'radio'].includes(field.type) && !(field.options ?? []).length)
       return `Field "${field.name}" needs at least one option.`;
+    if (
+      field.step !== undefined &&
+      (!Number.isInteger(field.step) || field.step < 1 || field.step > 20)
+    )
+      return `Field "${field.name}" has an invalid step.`;
+    if (field.conditional) {
+      if (!field.conditional.field.trim() || !field.conditional.equals.trim())
+        return `Field "${field.name}" needs a complete conditional rule.`;
+      if (field.conditional.field === field.name)
+        return `Field "${field.name}" cannot depend on itself.`;
+      if (!fields.some((candidate) => candidate.name === field.conditional?.field))
+        return `Conditional field "${field.conditional.field}" does not exist.`;
+    }
   }
   return null;
 }

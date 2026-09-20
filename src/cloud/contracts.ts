@@ -165,6 +165,7 @@ export interface FormField {
   options?: string[];
   validation?: Record<string, unknown>;
   conditional?: { field: string; equals: string };
+  step?: number;
 }
 export interface FormDefinition {
   id: string;
