@@ -369,7 +369,7 @@ export async function renderDashboard(
           ),
         )
       ).flat();
-      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Forms</p><h1>Production-ready forms</h1><p>Build accessible, validated forms with server-side storage. File uploads are intentionally unavailable.</p></div><button class="primary-btn" data-create-form ${sites[0] ? '' : 'disabled'}>New form</button></div><div class="website-grid">${forms.map((form) => `<article class="dashboard-panel collection-card"><div class="collection-mark">⌁</div><h2>${esc(form.name)}</h2><p class="website-url">${esc(form.siteName)} · /forms/${esc(form.slug)}</p><div class="website-meta"><span>${form.fields.length} fields</span><span>${form.settings.honeypot === false ? 'Honeypot off' : 'Honeypot on'}</span></div><div class="website-actions"><button class="primary-btn" data-submissions-form="${form.id}">View submissions</button></div></article>`).join('') || empty('No forms yet', 'Create a form with server-side validation and D1 submission storage.')}</div><div data-form-submissions></div>`;
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Forms</p><h1>Production-ready forms</h1><p>Build accessible, validated forms with server-side storage. File uploads are intentionally unavailable.</p></div><button class="primary-btn" data-create-form ${sites[0] ? '' : 'disabled'}>New form</button></div><div class="website-grid">${forms.map((form) => `<article class="dashboard-panel collection-card"><div class="collection-mark">⌁</div><h2>${esc(form.name)}</h2><p class="website-url">${esc(form.siteName)} · /forms/${esc(form.slug)}</p><div class="website-meta"><span>${form.fields.length} fields</span><span>${form.settings.honeypot === false ? 'Honeypot off' : 'Honeypot on'}</span></div><div class="website-actions"><button class="primary-btn" data-submissions-form="${form.id}">View submissions</button><button class="ghost-btn" data-edit-form="${form.id}">Edit fields</button></div></article>`).join('') || empty('No forms yet', 'Create a form with server-side validation and D1 submission storage.')}</div><div data-form-submissions></div>`;
       document.querySelector('[data-create-form]')?.addEventListener('click', async () => {
         const name = window.prompt('Form name');
         if (!name?.trim() || !sites[0]) return;
@@ -386,6 +386,25 @@ export async function renderDashboard(
           say(error instanceof Error ? error.message : 'Could not create form.');
         }
       });
+      document.querySelectorAll<HTMLButtonElement>('[data-edit-form]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          const form = forms.find((item) => item.id === button.dataset.editForm);
+          if (!form) return;
+          const value = window.prompt('Form fields JSON', JSON.stringify(form.fields, null, 2));
+          if (!value) return;
+          try {
+            await cloud.updateForm(form.id, { fields: JSON.parse(value) as unknown[] });
+            say('Form fields saved.');
+            await renderForms();
+          } catch (error) {
+            say(
+              error instanceof Error
+                ? error.message
+                : 'Form JSON is invalid or could not be saved.',
+            );
+          }
+        }),
+      );
       const renderSubmissionPanel = (formId: string, submissions: FormSubmission[]) => {
         const target = document.querySelector<HTMLElement>('[data-form-submissions]');
         if (!target) return;

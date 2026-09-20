@@ -642,6 +642,78 @@ app.post('/api/sites/:siteId/forms', async (c) => {
   );
 });
 
+app.patch('/api/forms/:formId', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const row = await getDb(c.env.DB)
+    .select({ form: formDefinition, membership: workspaceMembership })
+    .from(formDefinition)
+    .innerJoin(workspaceMembership, eq(formDefinition.workspaceId, workspaceMembership.workspaceId))
+    .where(
+      and(eq(formDefinition.id, c.req.param('formId')), eq(workspaceMembership.userId, user.id)),
+    )
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Form not found');
+  if (!roleAllows(row.membership.role, 'content'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
+  const body = await c.req.json<{
+    name?: string;
+    fields?: Array<{
+      id?: string;
+      name?: string;
+      type?: string;
+      label?: string;
+      required?: boolean;
+      options?: string[];
+      validation?: Record<string, unknown>;
+      conditional?: { field: string; equals: string };
+    }>;
+    settings?: Record<string, unknown>;
+    status?: 'active' | 'archived';
+  }>();
+  const name = body.name?.trim() || row.form.name;
+  const fields = body.fields ?? (jsonValue(row.form.fields, []) as Array<Record<string, unknown>>);
+  if (
+    fields.length > 100 ||
+    fields.some((field) => !field.name || !formFieldTypes.has(String(field.type ?? '')))
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Form fields must use supported types');
+  const ids = fields.map((field) => String(field.name));
+  if (new Set(ids).size !== ids.length)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Form field names must be unique');
+  const now = new Date();
+  await getDb(c.env.DB)
+    .update(formDefinition)
+    .set({
+      name,
+      fields: JSON.stringify(
+        fields.map((field) => ({
+          id: field.id ?? crypto.randomUUID(),
+          name: field.name,
+          type: field.type,
+          label: field.label ?? field.name,
+          required: Boolean(field.required),
+          options: field.options ?? [],
+          validation: field.validation ?? {},
+          conditional: field.conditional,
+        })),
+      ),
+      settings: JSON.stringify({ ...jsonValue(row.form.settings, {}), ...(body.settings ?? {}) }),
+      status: body.status ?? row.form.status,
+      updatedAt: now,
+    })
+    .where(eq(formDefinition.id, row.form.id));
+  return c.json(
+    formResponse(
+      (await getDb(c.env.DB)
+        .select()
+        .from(formDefinition)
+        .where(eq(formDefinition.id, row.form.id))
+        .get())!,
+    ),
+  );
+});
+
 app.get('/api/forms/:formId/submissions', async (c) => {
   const user = await currentUser(c);
   if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');

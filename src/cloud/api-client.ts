@@ -196,6 +196,20 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
       body: JSON.stringify({ name, fields }),
     });
   }
+  updateForm(
+    formId: string,
+    input: {
+      name?: string;
+      fields?: unknown[];
+      settings?: Record<string, unknown>;
+      status?: 'active' | 'archived';
+    },
+  ): Promise<FormDefinition> {
+    return this.request(`/api/forms/${encodeURIComponent(formId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  }
   listSubmissions(formId: string, query = ''): Promise<FormSubmission[]> {
     return this.request(
       `/api/forms/${encodeURIComponent(formId)}/submissions${query ? `?${query}` : ''}`,
