@@ -1,6 +1,7 @@
 import type { WebKilnApiClient } from './api-client';
 import type {
   AssetMetadata,
+  Automation,
   CloudSite,
   FormDefinition,
   FormField,
@@ -16,6 +17,11 @@ import { findDuplicateAssetIds } from '../assets/asset-storage';
 import { createProjectBackup, createStaticExport } from '../portability/export';
 import { WEBKILN_TEMPLATES } from './template-catalog';
 import { FORM_FIELD_TYPES, validateFormFields } from './form-builder';
+import {
+  AUTOMATION_ACTIONS,
+  AUTOMATION_TRIGGERS,
+  validateAutomationGraph,
+} from './automation-builder';
 
 const esc = (value: string) =>
   value.replace(
@@ -333,7 +339,7 @@ export async function renderDashboard(
     view.innerHTML = loading('Loading automations');
     try {
       const automations = await cloud.listAutomations(selectedWorkspaceId);
-      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Automations</p><h1>Visual automations</h1><p>Connect a trigger to conditions and actions without exposing credentials to the browser.</p></div><button class="primary-btn" data-create-automation>New automation</button></div><div class="automation-list">${automations.map((flow) => `<article class="dashboard-panel automation-card"><div class="automation-flow"><span class="flow-node">${esc(flow.triggerType)}</span><b>→</b><span class="flow-node">${flow.graph.conditions.length} conditions</span><b>→</b><span class="flow-node">${flow.graph.actions.length} actions</span></div><div class="automation-card-footer"><div><h2>${esc(flow.name)}</h2><small>${flow.status} · retry up to ${flow.retryPolicy.maxAttempts} times</small></div><button class="ghost-btn" data-toggle-automation="${flow.id}" data-status="${flow.status}">${flow.status === 'enabled' ? 'Disable' : 'Enable'}</button></div></article>`).join('') || empty('No automations yet', 'Create a draft flow with a trigger, conditions, and actions.')}</div>`;
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Automations</p><h1>Visual automations</h1><p>Connect a trigger to conditions and actions without exposing credentials to the browser.</p></div><button class="primary-btn" data-create-automation>New automation</button></div><div class="automation-list">${automations.map((flow) => `<article class="dashboard-panel automation-card"><div class="automation-flow"><span class="flow-node">${esc(flow.triggerType)}</span><b>→</b><span class="flow-node">${flow.graph.conditions.length} conditions</span><b>→</b><span class="flow-node">${flow.graph.actions.length} actions</span></div><div class="automation-card-footer"><div><h2>${esc(flow.name)}</h2><small>${flow.status} · retry up to ${flow.retryPolicy.maxAttempts} times</small></div><div class="website-actions"><button class="ghost-btn" data-edit-automation="${flow.id}">Edit flow</button><button class="ghost-btn" data-toggle-automation="${flow.id}" data-status="${flow.status}">${flow.status === 'enabled' ? 'Disable' : 'Enable'}</button></div></div></article>`).join('') || empty('No automations yet', 'Create a draft flow with a trigger, conditions, and actions.')}</div><div data-automation-editor></div>`;
       document.querySelector('[data-create-automation]')?.addEventListener('click', async () => {
         const name = window.prompt('Automation name');
         if (!name?.trim()) return;
@@ -361,6 +367,92 @@ export async function renderDashboard(
           } catch (error) {
             say(error instanceof Error ? error.message : 'Could not update automation.');
           }
+        }),
+      );
+      const renderAutomationEditor = (flow: Automation) => {
+        const target = document.querySelector<HTMLElement>('[data-automation-editor]');
+        if (!target) return;
+        const conditions = flow.graph.conditions.map((item) => ({ ...item }));
+        const actions = flow.graph.actions.map((item) => ({ ...item, config: { ...item.config } }));
+        const draw = () => {
+          target.innerHTML = `<section class="dashboard-panel automation-builder" aria-labelledby="automationBuilderTitle"><div class="panel-title"><div><p class="eyebrow">Automation builder</p><h2 id="automationBuilderTitle">${esc(flow.name)}</h2></div><span>Draft graph</span></div><div class="automation-builder-grid"><label>Trigger<select data-auto-trigger>${AUTOMATION_TRIGGERS.map((trigger) => `<option value="${trigger}" ${trigger === flow.triggerType ? 'selected' : ''}>${trigger.replaceAll('.', ' ')}</option>`).join('')}</select></label><label>Max retries<input type="number" min="0" max="5" data-auto-retries value="${flow.retryPolicy.maxAttempts}" /></label><label>Backoff seconds<input type="number" min="0" max="3600" data-auto-backoff value="${flow.retryPolicy.backoffSeconds}" /></label></div><div class="automation-builder-section"><div class="panel-title"><h3>Conditions</h3><button class="ghost-btn" type="button" data-add-condition>Add condition</button></div><div class="automation-builder-list">${conditions.map((condition, index) => `<div class="automation-builder-row" data-condition-index="${index}"><input data-condition-field value="${esc(condition.field)}" placeholder="Field" aria-label="Condition field" /><select data-condition-operator><option value="equals" ${condition.operator === 'equals' ? 'selected' : ''}>equals</option><option value="contains" ${condition.operator === 'contains' ? 'selected' : ''}>contains</option><option value="exists" ${condition.operator === 'exists' ? 'selected' : ''}>exists</option></select><input data-condition-value value="${esc(condition.value ?? '')}" placeholder="Value" aria-label="Condition value" /><button class="ghost-btn danger-action" type="button" data-remove-condition="${index}">Remove</button></div>`).join('') || '<p class="panel-note">No conditions: every matching trigger runs.</p>'}</div></div><div class="automation-builder-section"><div class="panel-title"><h3>Actions</h3><button class="ghost-btn" type="button" data-add-action>Add action</button></div><div class="automation-builder-list">${actions.map((action, index) => `<div class="automation-builder-row" data-action-index="${index}"><select data-action-type>${AUTOMATION_ACTIONS.map((type) => `<option value="${type}" ${type === action.type ? 'selected' : ''}>${type.replaceAll('-', ' ')}</option>`).join('')}</select><input data-action-value value="${esc(String(action.config.value ?? ''))}" placeholder="Action value" aria-label="Action value" /><button class="ghost-btn danger-action" type="button" data-remove-action="${index}">Remove</button></div>`).join('') || '<p class="panel-note">Add at least one action to make the flow useful.</p>'}</div></div><p class="panel-note">Webhook credentials and email delivery remain provider-bound and are never shown in this editor.</p><div class="form-builder-actions"><button class="primary-btn" type="button" data-save-automation>Save automation</button></div></section>`;
+          target.querySelector('[data-add-condition]')?.addEventListener('click', () => {
+            conditions.push({ field: '', operator: 'equals', value: '' });
+            draw();
+          });
+          target.querySelector('[data-add-action]')?.addEventListener('click', () => {
+            actions.push({ type: 'log-event', config: {} });
+            draw();
+          });
+          target.querySelectorAll<HTMLButtonElement>('[data-remove-condition]').forEach((button) =>
+            button.addEventListener('click', () => {
+              conditions.splice(Number(button.dataset.removeCondition), 1);
+              draw();
+            }),
+          );
+          target.querySelectorAll<HTMLButtonElement>('[data-remove-action]').forEach((button) =>
+            button.addEventListener('click', () => {
+              actions.splice(Number(button.dataset.removeAction), 1);
+              draw();
+            }),
+          );
+          target.querySelector('[data-save-automation]')?.addEventListener('click', async () => {
+            const nextConditions = Array.from(
+              target.querySelectorAll<HTMLElement>('[data-condition-index]'),
+            ).map((row) => ({
+              field:
+                row.querySelector<HTMLInputElement>('[data-condition-field]')?.value.trim() ?? '',
+              operator:
+                row.querySelector<HTMLSelectElement>('[data-condition-operator]')?.value ??
+                'equals',
+              value:
+                row.querySelector<HTMLInputElement>('[data-condition-value]')?.value.trim() ?? '',
+            }));
+            const nextActions = Array.from(
+              target.querySelectorAll<HTMLElement>('[data-action-index]'),
+            ).map((row) => ({
+              type:
+                row.querySelector<HTMLSelectElement>('[data-action-type]')?.value ?? 'log-event',
+              config: {
+                value:
+                  row.querySelector<HTMLInputElement>('[data-action-value]')?.value.trim() ?? '',
+              },
+            }));
+            const graph = { conditions: nextConditions, actions: nextActions };
+            const validationError = validateAutomationGraph(graph);
+            if (validationError) {
+              say(validationError);
+              return;
+            }
+            try {
+              await cloud.updateAutomation(flow.id, {
+                triggerType:
+                  target.querySelector<HTMLSelectElement>('[data-auto-trigger]')?.value ??
+                  flow.triggerType,
+                graph,
+                retryPolicy: {
+                  maxAttempts: Number(
+                    target.querySelector<HTMLInputElement>('[data-auto-retries]')?.value ?? 0,
+                  ),
+                  backoffSeconds: Number(
+                    target.querySelector<HTMLInputElement>('[data-auto-backoff]')?.value ?? 0,
+                  ),
+                },
+              });
+              say('Automation saved.');
+              await renderAutomations();
+            } catch (error) {
+              say(error instanceof Error ? error.message : 'Could not save automation.');
+            }
+          });
+        };
+        draw();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      document.querySelectorAll<HTMLButtonElement>('[data-edit-automation]').forEach((button) =>
+        button.addEventListener('click', () => {
+          const flow = automations.find((item) => item.id === button.dataset.editAutomation);
+          if (flow) renderAutomationEditor(flow);
         }),
       );
     } catch (error) {
