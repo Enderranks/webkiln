@@ -1,11 +1,21 @@
 import type { WebKilnApiClient } from './api-client';
-import type { AssetMetadata, CloudSite, FormSubmission, Session, Workspace } from './contracts';
+import type {
+  AssetMetadata,
+  CloudSite,
+  FormDefinition,
+  FormField,
+  FormFieldType,
+  FormSubmission,
+  Session,
+  Workspace,
+} from './contracts';
 import { navigate } from './app-router';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { createMigrationBackup, previewLocalProject } from './local-import';
 import { findDuplicateAssetIds } from '../assets/asset-storage';
 import { createProjectBackup, createStaticExport } from '../portability/export';
 import { WEBKILN_TEMPLATES } from './template-catalog';
+import { FORM_FIELD_TYPES, validateFormFields } from './form-builder';
 
 const esc = (value: string) =>
   value.replace(
@@ -369,7 +379,7 @@ export async function renderDashboard(
           ),
         )
       ).flat();
-      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Forms</p><h1>Production-ready forms</h1><p>Build accessible, validated forms with server-side storage. File uploads are intentionally unavailable.</p></div><button class="primary-btn" data-create-form ${sites[0] ? '' : 'disabled'}>New form</button></div><div class="website-grid">${forms.map((form) => `<article class="dashboard-panel collection-card"><div class="collection-mark">⌁</div><h2>${esc(form.name)}</h2><p class="website-url">${esc(form.siteName)} · /forms/${esc(form.slug)}</p><div class="website-meta"><span>${form.fields.length} fields</span><span>${form.settings.honeypot === false ? 'Honeypot off' : 'Honeypot on'}</span></div><div class="website-actions"><button class="primary-btn" data-submissions-form="${form.id}">View submissions</button><button class="ghost-btn" data-edit-form="${form.id}">Edit fields</button></div></article>`).join('') || empty('No forms yet', 'Create a form with server-side validation and D1 submission storage.')}</div><div data-form-submissions></div>`;
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Forms</p><h1>Production-ready forms</h1><p>Build accessible, validated forms with server-side storage. File uploads are intentionally unavailable.</p></div><button class="primary-btn" data-create-form ${sites[0] ? '' : 'disabled'}>New form</button></div><div class="website-grid">${forms.map((form) => `<article class="dashboard-panel collection-card"><div class="collection-mark">⌁</div><h2>${esc(form.name)}</h2><p class="website-url">${esc(form.siteName)} · /forms/${esc(form.slug)}</p><div class="website-meta"><span>${form.fields.length} fields</span><span>${form.settings.honeypot === false ? 'Honeypot off' : 'Honeypot on'}</span></div><div class="website-actions"><button class="primary-btn" data-submissions-form="${form.id}">View submissions</button><button class="ghost-btn" data-edit-form="${form.id}">Edit fields</button></div></article>`).join('') || empty('No forms yet', 'Create a form with server-side validation and D1 submission storage.')}</div><div data-form-editor></div><div data-form-submissions></div>`;
       document.querySelector('[data-create-form]')?.addEventListener('click', async () => {
         const name = window.prompt('Form name');
         if (!name?.trim() || !sites[0]) return;
@@ -390,21 +400,83 @@ export async function renderDashboard(
         button.addEventListener('click', async () => {
           const form = forms.find((item) => item.id === button.dataset.editForm);
           if (!form) return;
-          const value = window.prompt('Form fields JSON', JSON.stringify(form.fields, null, 2));
-          if (!value) return;
-          try {
-            await cloud.updateForm(form.id, { fields: JSON.parse(value) as unknown[] });
-            say('Form fields saved.');
-            await renderForms();
-          } catch (error) {
-            say(
-              error instanceof Error
-                ? error.message
-                : 'Form JSON is invalid or could not be saved.',
-            );
-          }
+          renderFormEditor(form);
         }),
       );
+      const renderFormEditor = (form: FormDefinition & { siteName?: string }) => {
+        const target = document.querySelector<HTMLElement>('[data-form-editor]');
+        if (!target) return;
+        let fields = form.fields.map((field) => ({ ...field }));
+        const draw = () => {
+          target.innerHTML = `<section class="dashboard-panel form-builder" aria-labelledby="formBuilderTitle"><div class="panel-title"><div><p class="eyebrow">Form builder</p><h2 id="formBuilderTitle">${esc(form.name)}</h2></div><span>${fields.length} fields</span></div><p class="panel-note">Build the form visually. Server-side validation remains authoritative when submissions arrive.</p><div class="form-field-list">${fields.map((field, index) => `<article class="form-field-card" data-form-field="${esc(field.id)}"><div class="form-field-head"><strong>Field ${index + 1}</strong><button class="ghost-btn danger-action" type="button" data-remove-form-field="${esc(field.id)}">Remove</button></div><div class="form-field-grid"><label>Type<select data-field-type>${FORM_FIELD_TYPES.map((type) => `<option value="${type}" ${type === field.type ? 'selected' : ''}>${type.replace('-', ' ')}</option>`).join('')}</select></label><label>Field name<input data-field-name value="${esc(field.name)}" required pattern="[A-Za-z][A-Za-z0-9_-]*" /></label><label class="form-field-wide">Visible label<input data-field-label value="${esc(field.label)}" required /></label><label class="form-field-wide">Options<input data-field-options value="${esc((field.options ?? []).join(', '))}" placeholder="One, Two, Three" /></label><label class="toggle-row form-field-wide"><span>Required</span><input type="checkbox" data-field-required ${field.required ? 'checked' : ''} /></label></div></article>`).join('') || '<p class="empty-state">Add a field to begin.</p>'}</div><div class="form-builder-actions"><button class="ghost-btn" type="button" data-add-form-field>Add field</button><label class="toggle-row"><span>Spam honeypot</span><input type="checkbox" data-form-honeypot ${form.settings.honeypot !== false ? 'checked' : ''} /></label><button class="primary-btn" type="button" data-save-form>Save form</button></div></section>`;
+          target.querySelectorAll<HTMLButtonElement>('[data-remove-form-field]').forEach((remove) =>
+            remove.addEventListener('click', () => {
+              fields = fields.filter((field) => field.id !== remove.dataset.removeFormField);
+              draw();
+            }),
+          );
+          target.querySelector('[data-add-form-field]')?.addEventListener('click', () => {
+            fields.push({
+              id: `field-${Date.now()}`,
+              name: `field${fields.length + 1}`,
+              type: 'text',
+              label: 'New field',
+              required: false,
+            });
+            draw();
+          });
+          target.querySelector('[data-save-form]')?.addEventListener('click', async () => {
+            const nextFields: FormField[] = [];
+            let invalid = false;
+            target.querySelectorAll<HTMLElement>('[data-form-field]').forEach((card) => {
+              const name =
+                card.querySelector<HTMLInputElement>('[data-field-name]')?.value.trim() ?? '';
+              const label =
+                card.querySelector<HTMLInputElement>('[data-field-label]')?.value.trim() ?? '';
+              if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(name) || !label) invalid = true;
+              const type = card.querySelector<HTMLSelectElement>('[data-field-type]')
+                ?.value as FormFieldType;
+              const options = card
+                .querySelector<HTMLInputElement>('[data-field-options]')
+                ?.value.split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+              nextFields.push({
+                id: card.dataset.formField ?? `field-${Date.now()}`,
+                name,
+                label,
+                type,
+                required:
+                  card.querySelector<HTMLInputElement>('[data-field-required]')?.checked ?? false,
+                ...(options?.length ? { options } : {}),
+              });
+            });
+            const validationError = invalid
+              ? 'Field labels and names are required.'
+              : validateFormFields(nextFields);
+            if (validationError) {
+              say(validationError);
+              return;
+            }
+            try {
+              await cloud.updateForm(form.id, {
+                fields: nextFields,
+                settings: {
+                  ...form.settings,
+                  honeypot:
+                    target.querySelector<HTMLInputElement>('[data-form-honeypot]')?.checked ?? true,
+                },
+              });
+              say('Form saved.');
+              await renderForms();
+            } catch (error) {
+              say(error instanceof Error ? error.message : 'Could not save the form.');
+            }
+          });
+        };
+        draw();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
       const renderSubmissionPanel = (formId: string, submissions: FormSubmission[]) => {
         const target = document.querySelector<HTMLElement>('[data-form-submissions]');
         if (!target) return;

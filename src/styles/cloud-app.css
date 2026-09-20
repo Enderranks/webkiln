@@ -816,6 +816,63 @@
   color: var(--cloud-muted);
   line-height: 1.7;
 }
+.form-builder {
+  margin-top: 16px;
+}
+.form-field-list {
+  display: grid;
+  gap: 10px;
+}
+.form-field-card {
+  border: 1px solid var(--cloud-line);
+  border-radius: 10px;
+  padding: 14px;
+  background: #101417;
+}
+.form-field-head,
+.form-builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.form-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.form-field-grid label {
+  display: grid;
+  gap: 5px;
+  color: var(--cloud-muted);
+  font-size: 11px;
+}
+.form-field-grid input,
+.form-field-grid select {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--cloud-line);
+  border-radius: 6px;
+  background: #0b0f11;
+  color: var(--cloud-text);
+}
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+.form-builder-actions {
+  justify-content: flex-end;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+@media (max-width: 650px) {
+  .form-field-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-field-wide {
+    grid-column: auto;
+  }
+}
 .status-mark {
   display: grid;
   place-items: center;
