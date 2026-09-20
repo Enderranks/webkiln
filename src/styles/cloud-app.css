@@ -858,6 +858,35 @@
   border-radius: 5px;
   padding: 0.48rem;
 }
+.team-panel {
+  margin-top: 1rem;
+}
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.team-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.team-row strong,
+.team-row small {
+  display: block;
+}
+.team-row small {
+  color: var(--muted, #a6aaa7);
+  margin-top: 0.2rem;
+}
+.team-row select {
+  background: #111416;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f4f5f3;
+  border-radius: 5px;
+  padding: 0.45rem;
+}
 .interaction-heading,
 .interaction-flow,
 .interaction-controls {

@@ -7,6 +7,11 @@ import { getDb } from './db/client';
 import {
   auditEvent,
   assetMetadata,
+  collaborationInvite,
+  pagePermission,
+  reviewComment,
+  approvalRequest,
+  reviewLink,
   cmsCollection,
   cmsField,
   cmsRecord,
@@ -23,7 +28,7 @@ import {
   workspaceMembership,
 } from './db/schema';
 import type { Env } from './env';
-import { currentUser, requireMembership } from './security';
+import { canonicalRole, currentUser, requireMembership, roleAllows } from './security';
 import {
   createPublishedSnapshot,
   hashPassword,
@@ -84,7 +89,7 @@ async function cmsAccess(
     .get();
   if (!item)
     return { error: true, response: jsonError(c, 404, 'NOT_FOUND', 'Collection not found') };
-  if (role === 'editor' && !['owner', 'admin', 'editor'].includes(item.membership.role))
+  if (role === 'editor' && !roleAllows(item.membership.role, 'content'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
   return { ...item, user };
 }
@@ -588,7 +593,7 @@ app.get('/api/forms/:formId/submissions', async (c) => {
     )
     .get();
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Form not found');
-  if (!['owner', 'admin', 'editor', 'viewer'].includes(row.membership.role))
+  if (!roleAllows(row.membership.role, 'view'))
     return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
   const submissions = await getDb(c.env.DB)
     .select()
@@ -780,7 +785,7 @@ app.patch('/api/automations/:automationId', async (c) => {
     )
     .get();
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Automation not found');
-  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+  if (!roleAllows(row.membership.role, 'design'))
     return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
   const body = await c.req.json<{
     name?: string;
@@ -827,7 +832,7 @@ app.get('/api/automations/:automationId/executions', async (c) => {
     )
     .get();
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Automation not found');
-  if (!['owner', 'admin', 'editor', 'viewer'].includes(row.membership.role))
+  if (!roleAllows(row.membership.role, 'view'))
     return jsonError(c, 403, 'FORBIDDEN', 'Workspace access required');
   return c.json(
     await getDb(c.env.DB)
@@ -948,7 +953,7 @@ app.patch('/api/records/:recordId', async (c) => {
     .where(and(eq(cmsRecord.id, c.req.param('recordId')), eq(workspaceMembership.userId, user.id)))
     .get();
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Record not found');
-  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+  if (!roleAllows(row.membership.role, 'content'))
     return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
   const body = await c.req.json<{
     data?: Record<string, unknown>;
@@ -1001,7 +1006,7 @@ app.delete('/api/records/:recordId', async (c) => {
     .where(and(eq(cmsRecord.id, c.req.param('recordId')), eq(workspaceMembership.userId, user.id)))
     .get();
   if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Record not found');
-  if (!['owner', 'admin', 'editor'].includes(row.membership.role))
+  if (!roleAllows(row.membership.role, 'content'))
     return jsonError(c, 403, 'FORBIDDEN', 'Editor access required');
   await getDb(c.env.DB).delete(cmsRecord).where(eq(cmsRecord.id, row.record.id));
   return c.body(null, 204);
@@ -2151,13 +2156,589 @@ async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'ed
     .where(and(eq(site.id, siteId), eq(workspaceMembership.userId, user.id)))
     .get();
   if (!record) return { error: true, response: jsonError(c, 404, 'NOT_FOUND', 'Site not found') };
-  const editorRoles = ['owner', 'admin', 'editor'];
-  if (role === 'editor' && !editorRoles.includes(record.membership.role))
+  if (role === 'editor' && !roleAllows(record.membership.role, 'design'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
-  if (role === 'owner' && record.membership.role !== 'owner')
+  if (role === 'owner' && !roleAllows(record.membership.role, 'owner'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Owner access required') };
   return { ...record, user };
 }
+
+async function hashToken(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+function collaborationRole(value: unknown): string | null {
+  return ['administrator', 'designer', 'content_editor', 'reviewer', 'viewer'].includes(
+    String(value),
+  )
+    ? String(value)
+    : null;
+}
+function auditRow(
+  workspaceId: string,
+  userId: string,
+  action: string,
+  resourceType: string,
+  resourceId: string,
+  siteId?: string,
+  metadata: Record<string, unknown> = {},
+) {
+  return {
+    id: crypto.randomUUID(),
+    workspaceId,
+    userId,
+    siteId: siteId ?? null,
+    action,
+    resourceType,
+    resourceId,
+    metadata: JSON.stringify(metadata),
+    createdAt: new Date(),
+  };
+}
+
+app.get('/api/workspaces/:workspaceId/members', async (c) => {
+  const workspaceId = c.req.param('workspaceId');
+  const access = await requireMembership(c, workspaceId, [
+    'owner',
+    'administrator',
+    'designer',
+    'content_editor',
+    'reviewer',
+    'viewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Workspace access required',
+    );
+  const db = getDb(c.env.DB);
+  const members = await db
+    .select()
+    .from(workspaceMembership)
+    .where(eq(workspaceMembership.workspaceId, workspaceId))
+    .all();
+  const invites = await db
+    .select()
+    .from(collaborationInvite)
+    .where(
+      and(
+        eq(collaborationInvite.workspaceId, workspaceId),
+        eq(collaborationInvite.invitationStatus, 'pending'),
+      ),
+    )
+    .all();
+  return c.json({
+    members: members.map((member) => ({ ...member, role: canonicalRole(member.role) })),
+    invitations: invites.map((invite) => ({
+      ...invite,
+      role: canonicalRole(invite.role),
+      expiresAt: invite.expiresAt.toISOString(),
+      createdAt: invite.createdAt.toISOString(),
+      delivery: 'copy_link',
+    })),
+  });
+});
+
+app.post('/api/workspaces/:workspaceId/invitations', async (c) => {
+  const workspaceId = c.req.param('workspaceId');
+  const access = await requireMembership(c, workspaceId, ['owner', 'administrator']);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Administrator access required',
+    );
+  const body = await c.req.json<{ email?: string; role?: string; expiresInDays?: number }>();
+  const email = body.email?.trim().toLowerCase();
+  const role = collaborationRole(body.role);
+  if (!email || !email.includes('@') || !role)
+    return jsonError(
+      c,
+      400,
+      'VALIDATION_ERROR',
+      'A valid email and collaboration role are required',
+    );
+  const rawToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const now = new Date();
+  const expiresAt = new Date(
+    now.getTime() + Math.min(30, Math.max(1, body.expiresInDays ?? 7)) * 86400000,
+  );
+  const id = crypto.randomUUID();
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB)
+      .insert(collaborationInvite)
+      .values({
+        id,
+        workspaceId,
+        email,
+        role,
+        tokenHash: await hashToken(rawToken),
+        invitationStatus: 'pending',
+        expiresAt,
+        invitedBy: access.user.id,
+        createdAt: now,
+        acceptedAt: null,
+      }),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(
+          workspaceId,
+          access.user.id,
+          'member.invited',
+          'collaboration_invite',
+          id,
+          undefined,
+          { role, email },
+        ),
+      ),
+  ]);
+  return c.json(
+    {
+      id,
+      workspaceId,
+      email,
+      role,
+      invitationStatus: 'pending',
+      expiresAt: expiresAt.toISOString(),
+      delivery: 'email_provider_unavailable',
+      inviteUrl: `${new URL(c.req.url).origin}/invite/${encodeURIComponent(rawToken)}`,
+    },
+    201,
+  );
+});
+
+app.post('/api/invitations/:token/accept', async (c) => {
+  const user = await currentUser(c);
+  if (!user) return jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required');
+  const tokenHash = await hashToken(c.req.param('token'));
+  const invite = await getDb(c.env.DB)
+    .select()
+    .from(collaborationInvite)
+    .where(eq(collaborationInvite.tokenHash, tokenHash))
+    .get();
+  if (!invite || invite.invitationStatus !== 'pending' || invite.expiresAt.getTime() < Date.now())
+    return jsonError(c, 404, 'NOT_FOUND', 'Invitation is unavailable or expired');
+  if (invite.email !== user.email.toLowerCase())
+    return jsonError(c, 403, 'FORBIDDEN', 'This invitation belongs to another account');
+  const now = new Date();
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB).insert(workspaceMembership).values({
+      id: crypto.randomUUID(),
+      workspaceId: invite.workspaceId,
+      userId: user.id,
+      role: invite.role,
+      invitationStatus: 'accepted',
+      createdAt: now,
+      updatedAt: now,
+    }),
+    getDb(c.env.DB)
+      .update(collaborationInvite)
+      .set({ invitationStatus: 'accepted', acceptedAt: now })
+      .where(eq(collaborationInvite.id, invite.id)),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(
+          invite.workspaceId,
+          user.id,
+          'member.accepted',
+          'collaboration_invite',
+          invite.id,
+          undefined,
+          {},
+        ),
+      ),
+  ]);
+  return c.json({ workspaceId: invite.workspaceId, role: canonicalRole(invite.role) });
+});
+
+app.patch('/api/workspaces/:workspaceId/members/:membershipId', async (c) => {
+  const workspaceId = c.req.param('workspaceId');
+  const access = await requireMembership(c, workspaceId, ['owner', 'administrator']);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Administrator access required',
+    );
+  const body = await c.req.json<{ role?: string }>();
+  const role = collaborationRole(body.role);
+  const member = await getDb(c.env.DB)
+    .select()
+    .from(workspaceMembership)
+    .where(
+      and(
+        eq(workspaceMembership.id, c.req.param('membershipId')),
+        eq(workspaceMembership.workspaceId, workspaceId),
+      ),
+    )
+    .get();
+  if (!member) return jsonError(c, 404, 'NOT_FOUND', 'Member not found');
+  if (member.role === 'owner' || !role)
+    return jsonError(c, 403, 'FORBIDDEN', 'Ownership cannot be changed through role management');
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB)
+      .update(workspaceMembership)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(workspaceMembership.id, member.id)),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(
+          workspaceId,
+          access.user.id,
+          'member.role_changed',
+          'workspace_membership',
+          member.id,
+          undefined,
+          { role },
+        ),
+      ),
+  ]);
+  return c.json({ id: member.id, role });
+});
+
+app.delete('/api/workspaces/:workspaceId/members/:membershipId', async (c) => {
+  const workspaceId = c.req.param('workspaceId');
+  const access = await requireMembership(c, workspaceId, ['owner', 'administrator']);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Administrator access required',
+    );
+  const member = await getDb(c.env.DB)
+    .select()
+    .from(workspaceMembership)
+    .where(
+      and(
+        eq(workspaceMembership.id, c.req.param('membershipId')),
+        eq(workspaceMembership.workspaceId, workspaceId),
+      ),
+    )
+    .get();
+  if (!member) return jsonError(c, 404, 'NOT_FOUND', 'Member not found');
+  if (member.role === 'owner')
+    return jsonError(c, 403, 'FORBIDDEN', 'Workspace ownership must be transferred explicitly');
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB).delete(workspaceMembership).where(eq(workspaceMembership.id, member.id)),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(workspaceId, access.user.id, 'member.removed', 'workspace_membership', member.id),
+      ),
+  ]);
+  return c.body(null, 204);
+});
+
+app.get('/api/sites/:siteId/review-comments', async (c) => {
+  const access = await getSiteAccess(c, 'viewer');
+  if ('error' in access) return access.response;
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(reviewComment)
+    .where(eq(reviewComment.siteId, access.site.id))
+    .orderBy(desc(reviewComment.createdAt))
+    .all();
+  return c.json(rows.map((row) => ({ ...row, mentions: jsonValue(row.mentions, []) })));
+});
+
+app.get('/api/sites/:siteId/page-permissions', async (c) => {
+  const access = await getSiteAccess(c, 'viewer');
+  if ('error' in access) return access.response;
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(pagePermission)
+    .where(eq(pagePermission.siteId, access.site.id))
+    .all();
+  return c.json(rows);
+});
+
+app.put('/api/sites/:siteId/pages/:pageId/permissions', async (c) => {
+  const access = await getSiteAccess(c, 'owner');
+  if ('error' in access) return access.response;
+  const body = await c.req.json<{ userId?: string; role?: string }>();
+  if (
+    !body.userId ||
+    !['viewer', 'content_editor', 'designer', 'reviewer'].includes(body.role ?? '')
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'A user and page role are required');
+  const pageRecord = await getDb(c.env.DB)
+    .select()
+    .from(page)
+    .where(and(eq(page.id, c.req.param('pageId')), eq(page.siteId, access.site.id)))
+    .get();
+  const member = await getDb(c.env.DB)
+    .select()
+    .from(workspaceMembership)
+    .where(
+      and(
+        eq(workspaceMembership.userId, body.userId),
+        eq(workspaceMembership.workspaceId, access.site.workspaceId),
+      ),
+    )
+    .get();
+  if (!pageRecord || !member)
+    return jsonError(c, 404, 'NOT_FOUND', 'Page or workspace member not found');
+  const now = new Date();
+  await getDb(c.env.DB)
+    .insert(pagePermission)
+    .values({
+      id: crypto.randomUUID(),
+      workspaceId: access.site.workspaceId,
+      siteId: access.site.id,
+      pageId: pageRecord.id,
+      userId: body.userId,
+      role: body.role!,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [pagePermission.pageId, pagePermission.userId],
+      set: { role: body.role!, updatedAt: now },
+    });
+  return c.json({ pageId: pageRecord.id, userId: body.userId, role: body.role });
+});
+
+app.post('/api/sites/:siteId/review-comments', async (c) => {
+  const access = await getSiteAccess(c, 'viewer');
+  if ('error' in access) return access.response;
+  if (!roleAllows(access.membership.role, 'review'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Review access required');
+  const body = await c.req.json<{
+    pageId?: string;
+    componentId?: string;
+    body?: string;
+    mentions?: Array<{ userId?: string; label?: string }>;
+  }>();
+  const text = body.body?.trim();
+  if (!text || text.length > 4000)
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Comment text is required');
+  const now = new Date();
+  const id = crypto.randomUUID();
+  const mentions = (body.mentions ?? [])
+    .filter((mention) => typeof mention.userId === 'string')
+    .slice(0, 20);
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB)
+      .insert(reviewComment)
+      .values({
+        id,
+        workspaceId: access.site.workspaceId,
+        siteId: access.site.id,
+        pageId: body.pageId ?? null,
+        componentId: body.componentId ?? null,
+        body: text,
+        mentions: JSON.stringify(mentions),
+        status: 'open',
+        createdBy: access.user.id,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(
+          access.site.workspaceId,
+          access.user.id,
+          'review.comment_created',
+          'review_comment',
+          id,
+          access.site.id,
+          { componentId: body.componentId ?? null },
+        ),
+      ),
+  ]);
+  return c.json({ id, body: text, status: 'open', mentions }, 201);
+});
+
+app.patch('/api/review-comments/:commentId', async (c) => {
+  const row = await getDb(c.env.DB)
+    .select()
+    .from(reviewComment)
+    .where(eq(reviewComment.id, c.req.param('commentId')))
+    .get();
+  if (!row) return jsonError(c, 404, 'NOT_FOUND', 'Comment not found');
+  const access = await requireMembership(c, row.workspaceId, [
+    'owner',
+    'administrator',
+    'designer',
+    'content_editor',
+    'reviewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Review access required',
+    );
+  const body = await c.req.json<{ status?: string }>();
+  if (!['open', 'resolved'].includes(body.status ?? ''))
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Review status is invalid');
+  await getDb(c.env.DB)
+    .update(reviewComment)
+    .set({ status: body.status!, updatedAt: new Date() })
+    .where(eq(reviewComment.id, row.id));
+  return c.json({ id: row.id, status: body.status });
+});
+
+app.get('/api/workspaces/:workspaceId/audit-log', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'administrator',
+    'reviewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Audit access required',
+    );
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(auditEvent)
+    .where(eq(auditEvent.workspaceId, c.req.param('workspaceId')))
+    .orderBy(desc(auditEvent.createdAt))
+    .limit(100)
+    .all();
+  return c.json(rows.map((row) => ({ ...row, metadata: jsonValue(row.metadata, {}) })));
+});
+
+app.post('/api/sites/:siteId/approval-requests', async (c) => {
+  const access = await getSiteAccess(c, 'editor');
+  if ('error' in access) return access.response;
+  const body = await c.req.json<{ note?: string }>();
+  const now = new Date();
+  const id = crypto.randomUUID();
+  await getDb(c.env.DB).batch([
+    getDb(c.env.DB)
+      .insert(approvalRequest)
+      .values({
+        id,
+        workspaceId: access.site.workspaceId,
+        siteId: access.site.id,
+        status: 'pending',
+        note: body.note?.slice(0, 1000) ?? '',
+        requestedBy: access.user.id,
+        reviewedBy: null,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    getDb(c.env.DB)
+      .insert(auditEvent)
+      .values(
+        auditRow(
+          access.site.workspaceId,
+          access.user.id,
+          'approval.requested',
+          'approval_request',
+          id,
+          access.site.id,
+        ),
+      ),
+  ]);
+  return c.json({ id, status: 'pending' }, 201);
+});
+
+app.patch('/api/approval-requests/:requestId', async (c) => {
+  const request = await getDb(c.env.DB)
+    .select()
+    .from(approvalRequest)
+    .where(eq(approvalRequest.id, c.req.param('requestId')))
+    .get();
+  if (!request) return jsonError(c, 404, 'NOT_FOUND', 'Approval request not found');
+  const access = await requireMembership(c, request.workspaceId, [
+    'owner',
+    'administrator',
+    'reviewer',
+  ]);
+  if ('error' in access)
+    return jsonError(
+      c,
+      access.error === 'UNAUTHENTICATED' ? 401 : 403,
+      access.error === 'UNAUTHENTICATED' ? 'UNAUTHENTICATED' : 'FORBIDDEN',
+      'Reviewer access required',
+    );
+  const body = await c.req.json<{ status?: string }>();
+  if (!['approved', 'rejected', 'cancelled'].includes(body.status ?? ''))
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Approval status is invalid');
+  await getDb(c.env.DB)
+    .update(approvalRequest)
+    .set({ status: body.status!, reviewedBy: access.user.id, updatedAt: new Date() })
+    .where(eq(approvalRequest.id, request.id));
+  return c.json({ id: request.id, status: body.status });
+});
+
+app.post('/api/sites/:siteId/review-links', async (c) => {
+  const access = await getSiteAccess(c, 'viewer');
+  if ('error' in access) return access.response;
+  if (!roleAllows(access.membership.role, 'review'))
+    return jsonError(c, 403, 'FORBIDDEN', 'Review access required');
+  const body = await c.req.json<{ mode?: string; expiresInHours?: number }>();
+  const mode = body.mode === 'client' ? 'client' : 'review';
+  const rawToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  const now = new Date();
+  const expiresAt = new Date(
+    now.getTime() + Math.min(168, Math.max(1, body.expiresInHours ?? 72)) * 3600000,
+  );
+  const id = crypto.randomUUID();
+  await getDb(c.env.DB)
+    .insert(reviewLink)
+    .values({
+      id,
+      workspaceId: access.site.workspaceId,
+      siteId: access.site.id,
+      mode,
+      tokenHash: await hashToken(rawToken),
+      expiresAt,
+      createdBy: access.user.id,
+      createdAt: now,
+    });
+  return c.json(
+    {
+      id,
+      siteId: access.site.id,
+      mode,
+      expiresAt: expiresAt.toISOString(),
+      url: `${new URL(c.req.url).origin}/review/${encodeURIComponent(rawToken)}`,
+    },
+    201,
+  );
+});
+
+app.get('/api/review-links/:token', async (c) => {
+  const tokenHash = await hashToken(c.req.param('token'));
+  const link = await getDb(c.env.DB)
+    .select()
+    .from(reviewLink)
+    .where(eq(reviewLink.tokenHash, tokenHash))
+    .get();
+  if (!link || link.expiresAt.getTime() < Date.now())
+    return jsonError(c, 404, 'NOT_FOUND', 'Review link expired or unavailable');
+  const siteRecord = await getDb(c.env.DB)
+    .select()
+    .from(site)
+    .where(eq(site.id, link.siteId))
+    .get();
+  if (!siteRecord) return jsonError(c, 404, 'NOT_FOUND', 'Review site unavailable');
+  return c.json({
+    id: link.id,
+    siteId: link.siteId,
+    workspaceId: link.workspaceId,
+    mode: link.mode,
+    expiresAt: link.expiresAt.toISOString(),
+    siteName: siteRecord.name,
+    realtime: false,
+  });
+});
 
 app.get('/api/workspaces/:workspaceId/assets', async (c) => {
   const access = await requireMembership(c, c.req.param('workspaceId'), [

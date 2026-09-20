@@ -1,6 +1,14 @@
 import type { WebKilnProject } from '../types';
 
-export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+export type WorkspaceRole =
+  | 'owner'
+  | 'administrator'
+  | 'designer'
+  | 'content_editor'
+  | 'reviewer'
+  | 'viewer'
+  | 'admin'
+  | 'editor';
 export type InvitationStatus = 'pending' | 'accepted' | 'declined';
 
 export interface AuthUser {
@@ -27,6 +35,47 @@ export interface WorkspaceMembership {
   userId: string;
   role: WorkspaceRole;
   invitationStatus: InvitationStatus;
+}
+export interface CollaborationInvite {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  invitationStatus: 'pending' | 'accepted' | 'revoked' | 'expired';
+  expiresAt: string;
+  createdAt: string;
+  delivery: 'copy_link' | 'email_provider_unavailable';
+  inviteUrl?: string;
+}
+export interface ReviewComment {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  pageId?: string | null;
+  componentId?: string | null;
+  body: string;
+  status: 'open' | 'resolved';
+  mentions: Array<{ userId: string; label?: string }>;
+  createdBy: string;
+  createdAt: string;
+}
+export interface ApprovalRequest {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  note: string;
+  requestedBy: string;
+  reviewedBy?: string | null;
+  createdAt: string;
+}
+export interface ReviewLink {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  mode: 'review' | 'client';
+  expiresAt: string;
+  url?: string;
 }
 export interface CloudSite {
   id: string;

@@ -304,6 +304,101 @@ export const auditEvent = sqliteTable(
   }),
 );
 
+export const collaborationInvite = sqliteTable(
+  'collaboration_invite',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    email: text('email').notNull(),
+    role: text('role').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    invitationStatus: text('invitation_status').notNull().default('pending'),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    invitedBy: text('invited_by').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    acceptedAt: integer('accepted_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => ({
+    workspaceLookup: index('collaboration_invite_workspace_lookup').on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+    tokenLookup: uniqueIndex('collaboration_invite_token_unique').on(table.tokenHash),
+  }),
+);
+export const pagePermission = sqliteTable(
+  'page_permission',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    siteId: text('site_id').notNull(),
+    pageId: text('page_id').notNull(),
+    userId: text('user_id').notNull(),
+    role: text('role').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    pageUserUnique: uniqueIndex('page_permission_unique').on(table.pageId, table.userId),
+    workspaceLookup: index('page_permission_workspace_lookup').on(table.workspaceId),
+  }),
+);
+export const reviewComment = sqliteTable(
+  'review_comment',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    siteId: text('site_id').notNull(),
+    pageId: text('page_id'),
+    componentId: text('component_id'),
+    body: text('body').notNull(),
+    mentions: text('mentions').notNull().default('[]'),
+    status: text('status').notNull().default('open'),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    siteLookup: index('review_comment_site_lookup').on(table.siteId, table.createdAt),
+    workspaceLookup: index('review_comment_workspace_lookup').on(table.workspaceId),
+  }),
+);
+export const approvalRequest = sqliteTable(
+  'approval_request',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    siteId: text('site_id').notNull(),
+    status: text('status').notNull().default('pending'),
+    note: text('note').notNull().default(''),
+    requestedBy: text('requested_by').notNull(),
+    reviewedBy: text('reviewed_by'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    siteLookup: index('approval_site_lookup').on(table.siteId, table.createdAt),
+    workspaceLookup: index('approval_workspace_lookup').on(table.workspaceId),
+  }),
+);
+export const reviewLink = sqliteTable(
+  'review_link',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    siteId: text('site_id').notNull(),
+    mode: text('mode').notNull().default('review'),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => ({
+    tokenUnique: uniqueIndex('review_link_token_unique').on(table.tokenHash),
+    siteLookup: index('review_link_site_lookup').on(table.siteId, table.expiresAt),
+  }),
+);
+
 export const publishedRelease = sqliteTable(
   'published_release',
   {

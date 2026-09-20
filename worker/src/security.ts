@@ -5,6 +5,9 @@ import { getAuth } from './auth';
 import { getDb } from './db/client';
 import { workspaceMembership } from './db/schema';
 import type { WorkspaceRole } from '../../src/cloud/contracts';
+import { collaborationRoles, roleAllows } from '../../src/cloud/roles';
+export { canonicalRole, roleAllows } from '../../src/cloud/roles';
+export const workspaceRoles = collaborationRoles;
 
 export async function currentUser(c: Context<{ Bindings: Env }>) {
   const session = await getAuth(c.env).api.getSession({ headers: c.req.raw.headers });
@@ -28,7 +31,25 @@ export async function requireMembership(
       ),
     )
     .get();
-  if (!membership || !roles.includes(membership.role as WorkspaceRole))
+  if (
+    !membership ||
+    !roles.some((role) =>
+      roleAllows(
+        membership.role,
+        role === 'owner'
+          ? 'owner'
+          : role === 'admin' || role === 'administrator'
+            ? 'admin'
+            : role === 'designer' || role === 'editor'
+              ? 'design'
+              : role === 'content_editor'
+                ? 'content'
+                : role === 'reviewer'
+                  ? 'review'
+                  : 'view',
+      ),
+    )
+  )
     return { error: 'FORBIDDEN' as const };
   return { user, membership };
 }

@@ -75,6 +75,7 @@ export async function renderDashboard(
     else if (section === 'automations') void renderAutomations();
     else if (section === 'forms') void renderForms();
     else if (section === 'assets') void renderAssets();
+    else if (section === 'team') void renderTeam();
     else if (section === 'templates') renderTemplates();
     else renderUnavailable(section);
   };
@@ -365,6 +366,66 @@ export async function renderDashboard(
   };
   const assetCard = (asset: AssetMetadata) =>
     `<article class="dashboard-panel asset-manager-card" data-asset-card><div class="asset-manager-thumb"><span>${asset.mimeType.startsWith('image/') ? '▧' : '▤'}</span><small>${esc(asset.mimeType)}${duplicateIds.has(asset.id) ? ' · Duplicate hash' : ''}</small></div><div class="asset-manager-body"><h2>${esc(asset.filename)}</h2><small>${formatBytes(asset.size)} · ${asset.usageCount ? `${asset.usageCount} usages` : 'Unused'} · ${esc(asset.storageStatus)}</small><label>Alt text<input data-alt value="${esc(asset.altText)}" placeholder="Describe the asset" /></label><label>Caption<input data-caption value="${esc(asset.caption)}" /></label><label>Focal point<input data-focal value="${asset.focalPoint.x}, ${asset.focalPoint.y}" placeholder="50, 50" /></label><label>Folder<input data-folder value="${esc(asset.folder)}" /></label><label>Tags<input data-tags value="${esc(asset.tags.join(', '))}" placeholder="brand, hero" /></label><label>Brand group<input data-brand value="${esc(asset.brandGroup ?? '')}" placeholder="Optional" /></label><div class="website-actions"><button class="primary-btn" data-asset-save="${asset.id}">Save details</button><button class="ghost-btn danger-action" data-asset-delete="${asset.id}" ${asset.usageCount ? 'disabled title="Replace usages before deleting"' : ''}>${asset.usageCount ? 'In use' : 'Delete'}</button></div></div></article>`;
+  const renderTeam = async () => {
+    if (!selectedWorkspaceId) return;
+    view.innerHTML = loading('Loading workspace members');
+    try {
+      const result = await cloud.listMembers(selectedWorkspaceId);
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Team</p><h1>People and permissions</h1><p>Roles are enforced by the Worker. Invitation email delivery is not connected; copy the secure invitation link instead.</p></div><button class="primary-btn" data-invite-member>Invite member</button></div><section class="dashboard-panel team-panel"><div class="panel-title"><h2>Members</h2><span>${result.members.length} active</span></div>${result.members.map((member) => `<div class="team-row"><div><strong>${esc(member.userId)}</strong><small>${member.invitationStatus}</small></div><select data-member-role="${member.id}">${['administrator', 'designer', 'content_editor', 'reviewer', 'viewer'].map((role) => `<option value="${role}" ${role === member.role ? 'selected' : ''}>${role.replace('_', ' ')}</option>`).join('')}</select><button class="ghost-btn danger-action" data-remove-member="${member.id}" ${member.role === 'owner' ? 'disabled' : ''}>Remove</button></div>`).join('')}</section><section class="dashboard-panel team-panel"><div class="panel-title"><h2>Pending invitations</h2><span>Email provider unavailable</span></div>${result.invitations.map((invite) => `<div class="team-row"><div><strong>${esc(invite.email)}</strong><small>${invite.role} · expires ${new Date(invite.expiresAt).toLocaleDateString()}</small></div><button class="ghost-btn" data-copy-invite="${esc(invite.inviteUrl ?? '')}">Copy link</button></div>`).join('') || empty('No pending invitations', 'Invite a collaborator when you are ready.')}</section>`;
+      document.querySelector('[data-invite-member]')?.addEventListener('click', async () => {
+        const email = window.prompt('Collaborator email');
+        if (!email) return;
+        const role =
+          window.prompt(
+            'Role: administrator, designer, content_editor, reviewer, or viewer',
+            'reviewer',
+          ) ?? 'reviewer';
+        try {
+          const invite = await cloud.inviteMember(selectedWorkspaceId, email, role);
+          await navigator.clipboard?.writeText(invite.inviteUrl ?? '');
+          say('Invitation link copied. Email delivery is not connected.');
+          void renderTeam();
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not create invitation.');
+        }
+      });
+      document.querySelectorAll<HTMLSelectElement>('[data-member-role]').forEach((select) =>
+        select.addEventListener('change', async () => {
+          try {
+            await cloud.updateMemberRole(
+              selectedWorkspaceId,
+              select.dataset.memberRole ?? '',
+              select.value,
+            );
+            say('Role updated.');
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not update role.');
+            void renderTeam();
+          }
+        }),
+      );
+      document.querySelectorAll<HTMLButtonElement>('[data-remove-member]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          if (!window.confirm('Remove this member?')) return;
+          try {
+            await cloud.removeMember(selectedWorkspaceId, button.dataset.removeMember ?? '');
+            say('Member removed.');
+            void renderTeam();
+          } catch (error) {
+            say(error instanceof Error ? error.message : 'Could not remove member.');
+          }
+        }),
+      );
+      document.querySelectorAll<HTMLButtonElement>('[data-copy-invite]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          await navigator.clipboard?.writeText(button.dataset.copyInvite ?? '');
+          say('Invitation link copied.');
+        }),
+      );
+    } catch (error) {
+      view.innerHTML = errorState(error, 'team');
+    }
+  };
   const renderUnavailable = (section: Section) => {
     const details: Record<string, [string, string]> = {
       domains: [

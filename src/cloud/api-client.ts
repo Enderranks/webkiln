@@ -18,6 +18,8 @@ import type {
   Automation,
   AutomationExecution,
   AssetMetadata,
+  CollaborationInvite,
+  WorkspaceMembership,
 } from './contracts';
 
 export class CloudApiError extends Error {
@@ -245,6 +247,42 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
     return this.request(`/api/assets/${encodeURIComponent(assetId)}/replace`, {
       method: 'POST',
       body: JSON.stringify({ replacementAssetId }),
+    });
+  }
+  listMembers(
+    workspaceId: string,
+  ): Promise<{ members: WorkspaceMembership[]; invitations: CollaborationInvite[] }> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/members`);
+  }
+  inviteMember(workspaceId: string, email: string, role: string): Promise<CollaborationInvite> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    });
+  }
+  updateMemberRole(
+    workspaceId: string,
+    membershipId: string,
+    role: string,
+  ): Promise<WorkspaceMembership> {
+    return this.request(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(membershipId)}`,
+      { method: 'PATCH', body: JSON.stringify({ role }) },
+    );
+  }
+  removeMember(workspaceId: string, membershipId: string): Promise<void> {
+    return this.request(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(membershipId)}`,
+      { method: 'DELETE' },
+    );
+  }
+  createReviewLink(
+    siteId: string,
+    mode: 'review' | 'client' = 'review',
+  ): Promise<{ url: string; expiresAt: string; mode: string }> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/review-links`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
     });
   }
   getProject(siteId: string): Promise<SiteProject> {
