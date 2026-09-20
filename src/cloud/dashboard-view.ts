@@ -426,7 +426,7 @@ export async function renderDashboard(
       ],
       forms: [
         'Form submissions',
-        'Submission storage is not enabled in the current free-tier milestone. Existing form blocks remain available in the editor.',
+        'Review stored submissions from your published forms. File uploads and email delivery remain intentionally unavailable.',
       ],
       assets: [
         'Asset library',
@@ -438,7 +438,7 @@ export async function renderDashboard(
       ],
       team: [
         'Team members',
-        'Team membership records are protected by the existing workspace authorization layer. Invitations will be enabled in a later milestone.',
+        'Manage workspace roles, protected invitations, and member access from the collaboration controls.',
       ],
       account: [
         'Account settings',

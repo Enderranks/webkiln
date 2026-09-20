@@ -4,4 +4,4 @@ V16 adds workspace-scoped D1 collections, typed fields, records, bounded search/
 
 Bindings are stored as WebKiln component metadata (`data-wk-collection`, `data-wk-field`, fallback and empty behavior). The public Worker resolves at most 50 bindings per page and 100 published records per binding, keeping free-tier queries bounded. Collection and record access always starts with the authenticated user’s workspace membership.
 
-Collection pages, list pages, related-record UI, category/tag routing, and dynamic SEO templates use the same binding model but remain an incremental follow-up surface. No R2 or paid service is required.
+Published collection list and record routes are available at `/sites/:siteSlug/collection/:collectionSlug` and `/sites/:siteSlug/collection/:collectionSlug/:recordSlug`. They are bounded to 100 published records, scoped to the published site's workspace, and render escaped text only. Visual collection-page templates, related-record UI, category/tag routing, and editor-configurable dynamic SEO templates remain incremental follow-up surface. No R2 or paid service is required.
