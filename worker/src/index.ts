@@ -1941,6 +1941,17 @@ app.post('/sites/:siteSlug/__access', async (c) => {
 });
 
 app.get('/sites/:siteSlug', async (c) => renderPublicPage(c, c.req.param('siteSlug'), '/'));
+app.get('/sites/:siteSlug/collection/:collectionSlug', async (c) =>
+  renderPublicCollection(c, c.req.param('siteSlug'), c.req.param('collectionSlug')),
+);
+app.get('/sites/:siteSlug/collection/:collectionSlug/:recordSlug', async (c) =>
+  renderPublicRecord(
+    c,
+    c.req.param('siteSlug'),
+    c.req.param('collectionSlug'),
+    c.req.param('recordSlug'),
+  ),
+);
 app.get('/sites/:siteSlug/:pageSlug', async (c) =>
   renderPublicPage(c, c.req.param('siteSlug'), normalizeSlug(c.req.param('pageSlug'))),
 );
@@ -1973,6 +1984,118 @@ async function renderPublicPage(
     Boolean(published.published.passwordHash) && !hasAccess,
   );
   return publicHtmlResponse(c, html, foundPage ? 200 : 404);
+}
+
+async function publicCollectionContext(c: Context<{ Bindings: Env }>, siteSlug: string) {
+  const published = await getPublishedSite(c, siteSlug);
+  if (!published || published.published.passwordHash) return null;
+  return published;
+}
+
+async function renderPublicCollection(
+  c: Context<{ Bindings: Env }>,
+  siteSlug: string,
+  collectionSlug: string,
+): Promise<Response> {
+  const published = await publicCollectionContext(c, siteSlug);
+  if (!published) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const collection = await getDb(c.env.DB)
+    .select()
+    .from(cmsCollection)
+    .where(
+      and(
+        eq(cmsCollection.workspaceId, published.site.workspaceId),
+        eq(cmsCollection.slug, collectionSlug.toLowerCase()),
+      ),
+    )
+    .get();
+  if (!collection) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const records = await getDb(c.env.DB)
+    .select()
+    .from(cmsRecord)
+    .where(and(eq(cmsRecord.collectionId, collection.id), eq(cmsRecord.status, 'published')))
+    .limit(100)
+    .all();
+  const base = `${publicSiteUrl(c, published.site.slug)}/collection/${encodeURIComponent(collection.slug)}`;
+  const items = records
+    .map((record) => {
+      const data = jsonValue(record.data, {}) as Record<string, unknown>;
+      const title = String(data.title ?? data.name ?? record.slug);
+      return `<article><h2><a href="${base}/${encodeURIComponent(record.slug)}">${escapePublicText(title)}</a></h2><p>${escapePublicText(String(data.description ?? ''))}</p></article>`;
+    })
+    .join('');
+  return publicHtmlResponse(
+    c,
+    publicCollectionHtml(
+      collection.name,
+      `Published ${collection.name}`,
+      `<main><h1>${escapePublicText(collection.name)}</h1>${items || '<p>No published records yet.</p>'}</main>`,
+      base,
+    ),
+    200,
+  );
+}
+
+async function renderPublicRecord(
+  c: Context<{ Bindings: Env }>,
+  siteSlug: string,
+  collectionSlug: string,
+  recordSlug: string,
+): Promise<Response> {
+  const published = await publicCollectionContext(c, siteSlug);
+  if (!published) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const collection = await getDb(c.env.DB)
+    .select()
+    .from(cmsCollection)
+    .where(
+      and(
+        eq(cmsCollection.workspaceId, published.site.workspaceId),
+        eq(cmsCollection.slug, collectionSlug.toLowerCase()),
+      ),
+    )
+    .get();
+  const record = collection
+    ? await getDb(c.env.DB)
+        .select()
+        .from(cmsRecord)
+        .where(
+          and(
+            eq(cmsRecord.collectionId, collection.id),
+            eq(cmsRecord.slug, recordSlug.toLowerCase()),
+            eq(cmsRecord.status, 'published'),
+          ),
+        )
+        .get()
+    : null;
+  if (!collection || !record) return publicHtmlResponse(c, '<main><h1>Not found</h1></main>', 404);
+  const data = jsonValue(record.data, {}) as Record<string, unknown>;
+  const title = String(data.title ?? data.name ?? record.slug);
+  const body = Object.entries(data)
+    .map(
+      ([key, value]) =>
+        `<section><h2>${escapePublicText(key)}</h2><p>${escapePublicText(String(value ?? ''))}</p></section>`,
+    )
+    .join('');
+  const canonical = `${publicSiteUrl(c, published.site.slug)}/collection/${encodeURIComponent(collection.slug)}/${encodeURIComponent(record.slug)}`;
+  return publicHtmlResponse(
+    c,
+    publicCollectionHtml(
+      title,
+      `Published ${collection.name}`,
+      `<main><h1>${escapePublicText(title)}</h1>${body}</main>`,
+      canonical,
+    ),
+    200,
+  );
+}
+
+function publicCollectionHtml(
+  title: string,
+  description: string,
+  body: string,
+  canonical: string,
+): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePublicText(title)}</title><meta name="description" content="${escapePublicText(description)}"><link rel="canonical" href="${escapePublicText(canonical)}"><meta property="og:title" content="${escapePublicText(title)}"><meta property="og:description" content="${escapePublicText(description)}"><style>body{max-width:900px;margin:0 auto;padding:48px 24px;font-family:system-ui,sans-serif;line-height:1.6}article,section{border-top:1px solid #ddd;padding:20px 0}a{color:inherit}</style></head><body>${body}</body></html>`;
 }
 
 async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string): Promise<string> {
