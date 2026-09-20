@@ -83,6 +83,7 @@ export class WebKilnEditorController {
   start(): void {
     this.bindShell();
     this.bindBlocks();
+    this.bindAssets();
     this.bindPages();
     this.bindInspector();
     this.bindLayers();
@@ -107,6 +108,17 @@ export class WebKilnEditorController {
       );
     document.querySelector('#zoomOut')?.addEventListener('click', () => this.changeZoom(-10));
     document.querySelector('#zoomIn')?.addEventListener('click', () => this.changeZoom(10));
+    document.querySelector('#setupBtn')?.addEventListener('click', () => {
+      document
+        .querySelector('#openSiteSetup')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    document.querySelector('#helpBtn')?.addEventListener('click', () => {
+      this.toast(
+        'WebKiln help',
+        'Select a section to edit it, or press Ctrl / Cmd + K to open commands.',
+      );
+    });
     document.querySelector('#deleteBtn')?.addEventListener('click', () => this.deleteSelected());
     document
       .querySelector('.outline-btn')
@@ -233,6 +245,13 @@ export class WebKilnEditorController {
         card.hidden = !card.innerText.toLowerCase().includes(query);
       });
     });
+    const componentSearch = document.querySelector<HTMLInputElement>('#componentSearch');
+    componentSearch?.addEventListener('input', () => {
+      const query = componentSearch.value.toLowerCase();
+      document.querySelectorAll<HTMLElement>('.component-row').forEach((row) => {
+        row.hidden = !row.innerText.toLowerCase().includes(query);
+      });
+    });
     document.querySelectorAll<HTMLButtonElement>('.chip').forEach((chip) =>
       chip.addEventListener('click', () => {
         document.querySelectorAll('.chip').forEach((item) => item.classList.remove('active'));
@@ -266,6 +285,69 @@ export class WebKilnEditorController {
       .forEach((row) =>
         row.addEventListener('click', () => this.addDefinition(row.dataset.component ?? 'heading')),
       );
+  }
+
+  private bindAssets(): void {
+    const input = document.querySelector<HTMLInputElement>('#assetInput');
+    const drop = document.querySelector<HTMLElement>('#assetDrop');
+    const openPicker = () => input?.click();
+    document.querySelector('#assetUploadButton')?.addEventListener('click', openPicker);
+    document.querySelector('#chooseAsset')?.addEventListener('click', openPicker);
+    input?.addEventListener('change', () => {
+      if (input.files) this.addLocalAssetMetadata([...input.files]);
+      input.value = '';
+    });
+    drop?.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      drop.classList.add('drag-active');
+    });
+    drop?.addEventListener('dragleave', () => drop.classList.remove('drag-active'));
+    drop?.addEventListener('drop', (event) => {
+      event.preventDefault();
+      drop.classList.remove('drag-active');
+      const files = (event as DragEvent).dataTransfer?.files;
+      if (files) this.addLocalAssetMetadata([...files]);
+    });
+    const search = document.querySelector<HTMLInputElement>('#assetSearch');
+    search?.addEventListener('input', () => {
+      const query = search.value.toLowerCase();
+      document.querySelectorAll<HTMLElement>('.asset-card').forEach((card) => {
+        card.hidden = !card.innerText.toLowerCase().includes(query);
+      });
+    });
+    this.renderAssetList();
+  }
+
+  private addLocalAssetMetadata(files: File[]): void {
+    const accepted = files.filter((file) => file.size > 0);
+    accepted.forEach((file) => {
+      this.project.assets.push({
+        id: `asset-${crypto.randomUUID().slice(0, 8)}`,
+        name: file.name,
+        mime: file.type || 'application/octet-stream',
+        size: file.size,
+      });
+    });
+    if (!accepted.length) return;
+    this.saveNow('Assets updated');
+    this.renderAssetList();
+    this.toast(
+      'Asset metadata added',
+      `${accepted.length} file${accepted.length === 1 ? '' : 's'} indexed. Binary cloud storage remains unavailable.`,
+    );
+  }
+
+  private renderAssetList(): void {
+    const list = document.querySelector<HTMLElement>('#assetList');
+    if (!list) return;
+    list.innerHTML = this.project.assets.length
+      ? this.project.assets
+          .map(
+            (asset) =>
+              `<article class="asset-card"><span class="asset-type">${escapePageText(asset.mime.split('/')[1] ?? 'file').toUpperCase()}</span><div><strong>${escapePageText(asset.name)}</strong><small>${Math.max(1, Math.round(asset.size / 1024))} KB · Metadata indexed</small></div></article>`,
+          )
+          .join('')
+      : '<small class="panel-note">No assets indexed yet. Add files to keep their metadata with this project.</small>';
   }
 
   private bindPages(): void {
