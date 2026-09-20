@@ -2386,7 +2386,10 @@ async function renderPublicPage(
   const hasAccess =
     !published.published.passwordHash ||
     (await validAccessToken(c, published.site.id, c.env.BETTER_AUTH_SECRET));
-  const resolvedPage = { ...page, html: await resolveDynamicHtml(c, page.html) };
+  const resolvedPage = {
+    ...page,
+    html: await resolveDynamicHtml(c, page.html, published.site.workspaceId),
+  };
   const html = publicHtml(
     published.snapshot,
     resolvedPage,
@@ -2513,7 +2516,11 @@ function publicCollectionHtml(
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePublicText(title)}</title><meta name="description" content="${escapePublicText(description)}"><link rel="canonical" href="${escapePublicText(canonical)}"><meta property="og:title" content="${escapePublicText(title)}"><meta property="og:description" content="${escapePublicText(description)}"><style>body{max-width:900px;margin:0 auto;padding:48px 24px;font-family:system-ui,sans-serif;line-height:1.6}article,section{border-top:1px solid #ddd;padding:20px 0}a{color:inherit}</style></head><body>${body}</body></html>`;
 }
 
-async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string): Promise<string> {
+async function resolveDynamicHtml(
+  c: Context<{ Bindings: Env }>,
+  source: string,
+  workspaceId: string,
+): Promise<string> {
   const bindingPattern =
     /<([a-z][a-z0-9-]*)([^>]*data-wk-collection=["']([^"']+)["'][^>]*data-wk-field=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
   let output = source;
@@ -2527,7 +2534,13 @@ async function resolveDynamicHtml(c: Context<{ Bindings: Env }>, source: string)
     const rows = await getDb(c.env.DB)
       .select()
       .from(cmsRecord)
-      .where(and(eq(cmsRecord.collectionId, collectionId), eq(cmsRecord.status, 'published')))
+      .where(
+        and(
+          eq(cmsRecord.collectionId, collectionId),
+          eq(cmsRecord.workspaceId, workspaceId),
+          eq(cmsRecord.status, 'published'),
+        ),
+      )
       .limit(100)
       .all();
     const value = (row: typeof cmsRecord.$inferSelect) =>
