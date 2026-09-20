@@ -104,6 +104,24 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
       body: JSON.stringify({ name }),
     });
   }
+  updateSite(
+    siteId: string,
+    update: { name?: string; status?: 'active' | 'archived'; customDomain?: string | null },
+  ): Promise<void> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    });
+  }
+  duplicateSite(siteId: string, name?: string): Promise<CloudSite> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+  deleteSite(siteId: string): Promise<void> {
+    return this.request(`/api/sites/${encodeURIComponent(siteId)}`, { method: 'DELETE' });
+  }
   getProject(siteId: string): Promise<SiteProject> {
     return this.request(`/api/sites/${encodeURIComponent(siteId)}/project`);
   }

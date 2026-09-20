@@ -207,15 +207,93 @@ app.get('/api/sites/:siteId', async (c) => {
 app.patch('/api/sites/:siteId', async (c) => {
   const record = await getSiteAccess(c, 'editor');
   if ('error' in record) return record.response;
-  const body = await c.req.json<{ name?: string; status?: 'active' | 'archived' }>();
-  const updates: { name?: string; status?: string; updatedBy: string; updatedAt: Date } = {
+  const body = await c.req.json<{
+    name?: string;
+    status?: 'active' | 'archived';
+    customDomain?: string | null;
+  }>();
+  const updates: {
+    name?: string;
+    status?: string;
+    customDomain?: string | null;
+    updatedBy: string;
+    updatedAt: Date;
+  } = {
     updatedBy: record.user.id,
     updatedAt: new Date(),
   };
   if (body.name?.trim()) updates.name = body.name.trim();
   if (body.status === 'active' || body.status === 'archived') updates.status = body.status;
+  if (body.customDomain === null || typeof body.customDomain === 'string')
+    updates.customDomain = body.customDomain?.trim() || null;
   await getDb(c.env.DB).update(site).set(updates).where(eq(site.id, record.site.id));
   return c.json({ ok: true });
+});
+
+app.post('/api/sites/:siteId/duplicate', async (c) => {
+  const record = await getSiteAccess(c, 'editor');
+  if ('error' in record) return record.response;
+  const body = await c.req.json<{ name?: string }>();
+  const id = crypto.randomUUID();
+  const name = body.name?.trim() || `${record.site.name} copy`;
+  const now = new Date();
+  const db = getDb(c.env.DB);
+  const pages = await db.select().from(page).where(eq(page.siteId, record.site.id)).all();
+  await db.insert(site).values({
+    id,
+    workspaceId: record.site.workspaceId,
+    name,
+    slug: `${normalizeSlug(name)}-${id.slice(0, 6)}`,
+    createdBy: record.user.id,
+    updatedBy: record.user.id,
+    themeData: record.site.themeData,
+    editorSettings: record.site.editorSettings,
+    settingsData: record.site.settingsData,
+    customCodeMetadata: record.site.customCodeMetadata,
+    createdAt: now,
+    updatedAt: now,
+  });
+  for (const item of pages)
+    await db
+      .insert(page)
+      .values({ ...item, id: crypto.randomUUID(), siteId: id, createdAt: now, updatedAt: now });
+  return c.json(
+    {
+      ...toCloudSite(
+        {
+          ...record.site,
+          id,
+          name,
+          slug: `${normalizeSlug(name)}-${id.slice(0, 6)}`,
+          workspaceId: record.site.workspaceId,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: record.user.id,
+          updatedBy: record.user.id,
+          currentRevision: 0,
+          status: 'active',
+          customDomain: null,
+        } as typeof site.$inferSelect,
+        pages.length,
+        record.user,
+      ),
+    },
+    201,
+  );
+});
+
+app.delete('/api/sites/:siteId', async (c) => {
+  const record = await getSiteAccess(c, 'owner');
+  if ('error' in record) return record.response;
+  if (record.site.status !== 'archived')
+    return jsonError(c, 409, 'VALIDATION_ERROR', 'Archive the website before deleting it');
+  const db = getDb(c.env.DB);
+  await db.delete(page).where(eq(page.siteId, record.site.id));
+  await db.delete(siteRevision).where(eq(siteRevision.siteId, record.site.id));
+  await db.delete(publishedRelease).where(eq(publishedRelease.siteId, record.site.id));
+  await db.delete(publishedSite).where(eq(publishedSite.siteId, record.site.id));
+  await db.delete(site).where(eq(site.id, record.site.id));
+  return c.body(null, 204);
 });
 
 app.get('/api/sites/:siteId/pages', async (c) => {
@@ -974,6 +1052,7 @@ function toCloudSite(item: typeof site.$inferSelect, pageCount: number, user: { 
     workspaceId: item.workspaceId,
     name: item.name,
     slug: item.slug,
+    customDomain: item.customDomain ?? null,
     status: item.status,
     homepagePageId: item.homepagePageId,
     currentRevision: item.currentRevision,
@@ -985,7 +1064,7 @@ function toCloudSite(item: typeof site.$inferSelect, pageCount: number, user: { 
 function accessUser(record: { user: { id: string } }) {
   return record.user;
 }
-async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'editor') {
+async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'editor' | 'owner') {
   const user = await currentUser(c);
   if (!user)
     return { error: true, response: jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required') };
@@ -1001,6 +1080,8 @@ async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'ed
   const editorRoles = ['owner', 'admin', 'editor'];
   if (role === 'editor' && !editorRoles.includes(record.membership.role))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
+  if (role === 'owner' && record.membership.role !== 'owner')
+    return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Owner access required') };
   return { ...record, user };
 }
 

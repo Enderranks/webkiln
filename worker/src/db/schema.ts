@@ -47,6 +47,7 @@ export const site = sqliteTable(
     workspaceId: text('workspace_id').notNull(),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
+    customDomain: text('custom_domain'),
     status: text('status').notNull().default('active'),
     homepagePageId: text('homepage_page_id'),
     projectSchemaVersion: integer('project_schema_version').notNull().default(2),

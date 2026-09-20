@@ -33,6 +33,7 @@ export interface CloudSite {
   workspaceId: string;
   name: string;
   slug: string;
+  customDomain?: string | null;
   status: 'active' | 'archived';
   homepagePageId: string | null;
   currentRevision: number;
