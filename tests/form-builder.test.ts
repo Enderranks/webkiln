@@ -49,4 +49,10 @@ describe('visual form builder validation', () => {
       ]),
     ).toContain('does not exist');
   });
+
+  it('rejects malformed custom validation patterns', () => {
+    expect(validateFormFields([{ ...base, validation: { pattern: '[' } }])).toContain(
+      'validation pattern',
+    );
+  });
 });

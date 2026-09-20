@@ -504,7 +504,7 @@ export async function renderDashboard(
             fields
               .map(
                 (field, index) =>
-                  `<article class="form-field-card" data-form-field="${esc(field.id)}"><div class="form-field-head"><strong>Field ${index + 1}</strong><button class="ghost-btn danger-action" type="button" data-remove-form-field="${esc(field.id)}">Remove</button></div><div class="form-field-grid"><label>Type<select data-field-type>${FORM_FIELD_TYPES.map((type) => `<option value="${type}" ${type === field.type ? 'selected' : ''}>${type.replace('-', ' ')}</option>`).join('')}</select></label><label>Field name<input data-field-name value="${esc(field.name)}" required pattern="[A-Za-z][A-Za-z0-9_-]*" /></label><label class="form-field-wide">Visible label<input data-field-label value="${esc(field.label)}" required /></label><label class="form-field-wide">Options<input data-field-options value="${esc((field.options ?? []).join(', '))}" placeholder="One, Two, Three" /></label><label>Step<input type="number" min="1" max="20" data-field-step value="${field.step ?? 1}" /></label><label>Show when<select data-field-condition-field><option value="">Always visible</option>${fields
+                  `<article class="form-field-card" data-form-field="${esc(field.id)}"><div class="form-field-head"><strong>Field ${index + 1}</strong><button class="ghost-btn danger-action" type="button" data-remove-form-field="${esc(field.id)}">Remove</button></div><div class="form-field-grid"><label>Type<select data-field-type>${FORM_FIELD_TYPES.map((type) => `<option value="${type}" ${type === field.type ? 'selected' : ''}>${type.replace('-', ' ')}</option>`).join('')}</select></label><label>Field name<input data-field-name value="${esc(field.name)}" required pattern="[A-Za-z][A-Za-z0-9_-]*" /></label><label class="form-field-wide">Visible label<input data-field-label value="${esc(field.label)}" required /></label><label class="form-field-wide">Options<input data-field-options value="${esc((field.options ?? []).join(', '))}" placeholder="One, Two, Three" /></label><label class="form-field-wide">Validation pattern<input data-field-pattern value="${esc(String(field.validation?.pattern ?? ''))}" placeholder="Optional regular expression" /></label><label>Step<input type="number" min="1" max="20" data-field-step value="${field.step ?? 1}" /></label><label>Show when<select data-field-condition-field><option value="">Always visible</option>${fields
                     .filter((candidate) => candidate.id !== field.id)
                     .map(
                       (candidate) =>
@@ -557,6 +557,8 @@ export async function renderDashboard(
               const step = Number(
                 card.querySelector<HTMLInputElement>('[data-field-step]')?.value ?? 1,
               );
+              const pattern =
+                card.querySelector<HTMLInputElement>('[data-field-pattern]')?.value.trim() ?? '';
               nextFields.push({
                 id: card.dataset.formField ?? `field-${Date.now()}`,
                 name,
@@ -565,6 +567,7 @@ export async function renderDashboard(
                 required:
                   card.querySelector<HTMLInputElement>('[data-field-required]')?.checked ?? false,
                 ...(options?.length ? { options } : {}),
+                ...(pattern ? { validation: { pattern } } : {}),
                 step: Number.isInteger(step) && step > 0 ? step : 1,
                 ...(conditionField && conditionValue
                   ? { conditional: { field: conditionField, equals: conditionValue } }

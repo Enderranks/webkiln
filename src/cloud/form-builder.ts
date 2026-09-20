@@ -33,6 +33,16 @@ export function validateFormFields(fields: Array<Partial<FormField>>): string | 
       (!Number.isInteger(field.step) || field.step < 1 || field.step > 20)
     )
       return `Field "${field.name}" has an invalid step.`;
+    const pattern = field.validation?.pattern;
+    if (pattern !== undefined) {
+      if (typeof pattern !== 'string' || pattern.length > 256)
+        return `Field "${field.name}" has an invalid validation pattern.`;
+      try {
+        new RegExp(pattern);
+      } catch {
+        return `Field "${field.name}" has an invalid validation pattern.`;
+      }
+    }
     if (field.conditional) {
       if (!field.conditional.field.trim() || !field.conditional.equals.trim())
         return `Field "${field.name}" needs a complete conditional rule.`;

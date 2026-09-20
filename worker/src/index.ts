@@ -322,12 +322,13 @@ function validateFormPayload(
     if (field.type === 'consent' && value !== true && value !== 'true')
       return `${field.name} must be accepted`;
     const pattern = field.validation?.pattern;
-    if (
-      typeof pattern === 'string' &&
-      typeof value === 'string' &&
-      !new RegExp(pattern).test(value)
-    )
-      return `${field.name} has an invalid format`;
+    if (typeof pattern === 'string' && typeof value === 'string') {
+      try {
+        if (!new RegExp(pattern).test(value)) return `${field.name} has an invalid format`;
+      } catch {
+        return `${field.name} has an invalid validation rule`;
+      }
+    }
   }
   return null;
 }
