@@ -1,8 +1,9 @@
 import type { WebKilnApiClient } from './api-client';
-import type { CloudSite, Session, Workspace } from './contracts';
+import type { AssetMetadata, CloudSite, Session, Workspace } from './contracts';
 import { navigate } from './app-router';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { createMigrationBackup, previewLocalProject } from './local-import';
+import { findDuplicateAssetIds } from '../assets/asset-storage';
 
 const esc = (value: string) =>
   value.replace(
@@ -35,6 +36,7 @@ export async function renderDashboard(
   let workspaces: Workspace[] = [];
   let selectedWorkspaceId = '';
   let sites: CloudSite[] = [];
+  let duplicateIds = new Set<string>();
   const view = document.querySelector<HTMLElement>('[data-dashboard-view]')!;
   const message = document.querySelector<HTMLElement>('[data-dashboard-message]')!;
   const say = (text: string) => {
@@ -72,6 +74,7 @@ export async function renderDashboard(
     else if (section === 'collections') void renderCollections();
     else if (section === 'automations') void renderAutomations();
     else if (section === 'forms') void renderForms();
+    else if (section === 'assets') void renderAssets();
     else if (section === 'templates') renderTemplates();
     else renderUnavailable(section);
   };
@@ -241,6 +244,127 @@ export async function renderDashboard(
       view.innerHTML = errorState(error, 'forms');
     }
   };
+  const renderAssets = async () => {
+    view.innerHTML = loading('Loading asset library');
+    if (!selectedWorkspaceId) {
+      view.innerHTML = empty('No workspace selected', 'Create a workspace before managing assets.');
+      return;
+    }
+    try {
+      const assets = await cloud.listAssets(selectedWorkspaceId);
+      duplicateIds = findDuplicateAssetIds(assets);
+      const usage = assets.reduce((sum, asset) => sum + asset.size, 0);
+      view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Assets</p><h1>Asset library</h1><p>Organize metadata, usage, and brand context. Binary storage is not configured in this free-tier milestone.</p></div><button class="primary-btn" data-register-asset ${sites[0] ? '' : 'disabled'}>Register metadata</button></div><section class="asset-capability dashboard-panel"><strong>Storage not configured</strong><span>Metadata is available now. Uploads, R2, WebP, AVIF, thumbnails, and responsive transformations remain disabled until an approved storage milestone.</span><b>${formatBytes(usage)} estimated metadata-linked usage · ${assets.length} assets</b></section><div class="asset-toolbar"><input type="search" data-asset-search placeholder="Search filename, tags, or alt text" aria-label="Search assets" /><select data-asset-type aria-label="Filter file type"><option value="">All file types</option><option value="image">Images</option><option value="video">Video</option><option value="application">Documents</option></select><select data-asset-sort aria-label="Sort assets"><option value="updated">Recently updated</option><option value="name">Name</option><option value="size">Largest</option></select></div><div class="asset-manager-grid" data-asset-grid>${assets.map(assetCard).join('') || empty('No asset metadata yet', 'Register an asset reference or keep using the local editor asset system.')}</div>`;
+      const reload = () => void renderAssets();
+      document.querySelector('[data-register-asset]')?.addEventListener('click', async () => {
+        if (!sites[0]) return;
+        const filename = window.prompt('Asset filename');
+        if (!filename?.trim()) return;
+        const mimeType =
+          window.prompt(
+            'MIME type',
+            filename.match(/\.(png|jpe?g|webp|avif)$/i)
+              ? 'image/' + filename.split('.').pop()
+              : 'application/octet-stream',
+          ) ?? 'application/octet-stream';
+        const size = Number(window.prompt('Approximate size in bytes', '0') ?? 0);
+        try {
+          await cloud.createAsset(selectedWorkspaceId, {
+            siteId: sites[0].id,
+            filename: filename.trim(),
+            mimeType,
+            size: Number.isFinite(size) ? size : 0,
+          });
+          say('Asset metadata registered.');
+          reload();
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not register asset.');
+        }
+      });
+      const applyFilters = async () => {
+        const query = new URLSearchParams();
+        const search = document
+          .querySelector<HTMLInputElement>('[data-asset-search]')
+          ?.value.trim();
+        const type = document.querySelector<HTMLSelectElement>('[data-asset-type]')?.value;
+        const sort = document.querySelector<HTMLSelectElement>('[data-asset-sort]')?.value;
+        if (search) query.set('q', search);
+        if (type) query.set('type', type);
+        if (sort) query.set('sort', sort);
+        const filtered = await cloud.listAssets(selectedWorkspaceId, query.toString());
+        const grid = document.querySelector<HTMLElement>('[data-asset-grid]');
+        if (grid)
+          grid.innerHTML =
+            filtered.map(assetCard).join('') ||
+            empty('No matching assets', 'Try a different search or filter.');
+        bindAssetActions();
+      };
+      document
+        .querySelector('[data-asset-search]')
+        ?.addEventListener('input', () => void applyFilters());
+      document
+        .querySelector('[data-asset-type]')
+        ?.addEventListener('change', () => void applyFilters());
+      document
+        .querySelector('[data-asset-sort]')
+        ?.addEventListener('change', () => void applyFilters());
+      bindAssetActions();
+    } catch (error) {
+      view.innerHTML = errorState(error, 'assets');
+    }
+  };
+  const bindAssetActions = () => {
+    document.querySelectorAll<HTMLButtonElement>('[data-asset-save]').forEach((button) =>
+      button.addEventListener('click', async () => {
+        const card = button.closest<HTMLElement>('[data-asset-card]');
+        if (!card) return;
+        try {
+          await cloud.updateAsset(button.dataset.assetSave ?? '', {
+            altText: card.querySelector<HTMLInputElement>('[data-alt]')?.value ?? '',
+            caption: card.querySelector<HTMLInputElement>('[data-caption]')?.value ?? '',
+            focalPoint: (() => {
+              const [x, y] = (
+                card.querySelector<HTMLInputElement>('[data-focal]')?.value ?? '50, 50'
+              )
+                .split(',')
+                .map(Number);
+              return {
+                x: Number.isFinite(x) ? Math.max(0, Math.min(100, x)) : 50,
+                y: Number.isFinite(y) ? Math.max(0, Math.min(100, y)) : 50,
+              };
+            })(),
+            folder: card.querySelector<HTMLInputElement>('[data-folder]')?.value ?? '/',
+            tags: (card.querySelector<HTMLInputElement>('[data-tags]')?.value ?? '')
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            brandGroup: card.querySelector<HTMLInputElement>('[data-brand]')?.value ?? '',
+          });
+          say('Asset details saved.');
+        } catch (error) {
+          say(error instanceof Error ? error.message : 'Could not save asset details.');
+        }
+      }),
+    );
+    document.querySelectorAll<HTMLButtonElement>('[data-asset-delete]').forEach((button) =>
+      button.addEventListener('click', async () => {
+        if (!window.confirm('Delete this unused asset metadata?')) return;
+        try {
+          await cloud.deleteAsset(button.dataset.assetDelete ?? '');
+          say('Asset metadata deleted.');
+          void renderAssets();
+        } catch (error) {
+          say(
+            error instanceof Error
+              ? error.message
+              : 'Asset is still in use or could not be deleted.',
+          );
+        }
+      }),
+    );
+  };
+  const assetCard = (asset: AssetMetadata) =>
+    `<article class="dashboard-panel asset-manager-card" data-asset-card><div class="asset-manager-thumb"><span>${asset.mimeType.startsWith('image/') ? '▧' : '▤'}</span><small>${esc(asset.mimeType)}${duplicateIds.has(asset.id) ? ' · Duplicate hash' : ''}</small></div><div class="asset-manager-body"><h2>${esc(asset.filename)}</h2><small>${formatBytes(asset.size)} · ${asset.usageCount ? `${asset.usageCount} usages` : 'Unused'} · ${esc(asset.storageStatus)}</small><label>Alt text<input data-alt value="${esc(asset.altText)}" placeholder="Describe the asset" /></label><label>Caption<input data-caption value="${esc(asset.caption)}" /></label><label>Focal point<input data-focal value="${asset.focalPoint.x}, ${asset.focalPoint.y}" placeholder="50, 50" /></label><label>Folder<input data-folder value="${esc(asset.folder)}" /></label><label>Tags<input data-tags value="${esc(asset.tags.join(', '))}" placeholder="brand, hero" /></label><label>Brand group<input data-brand value="${esc(asset.brandGroup ?? '')}" placeholder="Optional" /></label><div class="website-actions"><button class="primary-btn" data-asset-save="${asset.id}">Save details</button><button class="ghost-btn danger-action" data-asset-delete="${asset.id}" ${asset.usageCount ? 'disabled title="Replace usages before deleting"' : ''}>${asset.usageCount ? 'In use' : 'Delete'}</button></div></div></article>`;
   const renderUnavailable = (section: Section) => {
     const details: Record<string, [string, string]> = {
       domains: [
@@ -253,7 +377,7 @@ export async function renderDashboard(
       ],
       assets: [
         'Asset library',
-        'Asset metadata and R2-backed storage are reserved for the asset-storage milestone.',
+        'Asset metadata is available from the Assets section. Binary storage remains intentionally unconfigured.',
       ],
       billing: [
         'Billing',
@@ -363,6 +487,12 @@ export async function renderDashboard(
       account: '⚙',
     })[section] ?? '•';
   const sectionLabel = (section: string) => section.charAt(0).toUpperCase() + section.slice(1);
+  const formatBytes = (bytes: number) =>
+    bytes < 1024
+      ? `${bytes} B`
+      : bytes < 1024 ** 2
+        ? `${(bytes / 1024).toFixed(1)} KB`
+        : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
   const signOut = async (client: WebKilnApiClient) => {
     await client.signOut().catch(() => undefined);
     navigate('/login');

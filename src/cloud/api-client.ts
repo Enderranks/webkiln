@@ -17,6 +17,7 @@ import type {
   FormSubmission,
   Automation,
   AutomationExecution,
+  AssetMetadata,
 } from './contracts';
 
 export class CloudApiError extends Error {
@@ -216,6 +217,35 @@ export class WebKilnApiClient implements ProjectRepository, AuthProvider {
   }
   listAutomationExecutions(automationId: string): Promise<AutomationExecution[]> {
     return this.request(`/api/automations/${encodeURIComponent(automationId)}/executions`);
+  }
+  listAssets(workspaceId: string, query = ''): Promise<AssetMetadata[]> {
+    return this.request(
+      `/api/workspaces/${encodeURIComponent(workspaceId)}/assets${query ? `?${query}` : ''}`,
+    );
+  }
+  createAsset(workspaceId: string, input: Record<string, unknown>): Promise<AssetMetadata> {
+    return this.request(`/api/workspaces/${encodeURIComponent(workspaceId)}/assets`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  updateAsset(assetId: string, input: Record<string, unknown>): Promise<AssetMetadata> {
+    return this.request(`/api/assets/${encodeURIComponent(assetId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  }
+  deleteAsset(assetId: string): Promise<void> {
+    return this.request(`/api/assets/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
+  }
+  replaceAsset(
+    assetId: string,
+    replacementAssetId: string,
+  ): Promise<{ replacedPages: number; replacementAssetId: string }> {
+    return this.request(`/api/assets/${encodeURIComponent(assetId)}/replace`, {
+      method: 'POST',
+      body: JSON.stringify({ replacementAssetId }),
+    });
   }
   getProject(siteId: string): Promise<SiteProject> {
     return this.request(`/api/sites/${encodeURIComponent(siteId)}/project`);
