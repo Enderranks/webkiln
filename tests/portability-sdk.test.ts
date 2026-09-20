@@ -8,7 +8,11 @@ import {
   parseProjectBackup,
   recordsToCsv,
 } from '../src/portability/export';
-import { migrateComponentPackage, validateComponentPackage } from '../src/components-sdk/sdk';
+import {
+  migrateComponentPackage,
+  sanitizeComponentStyles,
+  validateComponentPackage,
+} from '../src/components-sdk/sdk';
 
 describe('v21 portability and component SDK', () => {
   it('exports clean markup and strips editor/unsafe content', () => {
@@ -71,6 +75,15 @@ describe('v21 portability and component SDK', () => {
     };
     expect(validateComponentPackage(pkg)).toBe(true);
     expect(validateComponentPackage({ ...pkg, markup: '<script>bad()</script>' })).toBe(false);
+    expect(
+      validateComponentPackage({ ...pkg, styles: '@import url(https://evil.test/x.css)' }),
+    ).toBe(false);
+    expect(validateComponentPackage({ ...pkg, styles: '.x{background:url(javascript:bad)}' })).toBe(
+      false,
+    );
+    expect(sanitizeComponentStyles('@import url(x); .x{behavior:url(x);color:red}')).toBe(
+      '.x{color:red}',
+    );
     expect(migrateComponentPackage(pkg, 2).manifest.version).toBe(2);
   });
 });

@@ -26,6 +26,8 @@ export interface ComponentPackage {
   migrations?: Record<string, { to: number }>;
 }
 const safeIdentifier = /^[a-z][a-z0-9-]{1,63}$/;
+const unsafePackageContent =
+  /<script\b|on[a-z]+\s*=|javascript\s*:|srcdoc\s*=|@import\b|expression\s*\(|behavior\s*:|-moz-binding\s*:|url\s*\(\s*["']?\s*javascript\s*:/i;
 export function validateComponentPackage(value: unknown): value is ComponentPackage {
   if (!value || typeof value !== 'object') return false;
   const pkg = value as Partial<ComponentPackage>;
@@ -38,7 +40,7 @@ export function validateComponentPackage(value: unknown): value is ComponentPack
     !safeIdentifier.test(manifest.id ?? '')
   )
     return false;
-  if (/<script\b|on[a-z]+\s*=|javascript:/i.test(`${pkg.markup}\n${pkg.styles}`)) return false;
+  if (unsafePackageContent.test(`${pkg.markup}\n${pkg.styles}`)) return false;
   return (
     Array.isArray(manifest.editableFields) &&
     Array.isArray(manifest.traits) &&
@@ -60,4 +62,14 @@ export function sanitizeComponentMarkup(markup: string): string {
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/\s(on[a-z]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/\s(href|src)=("|')\s*javascript:[^"']*\2/gi, '');
+}
+
+export function sanitizeComponentStyles(styles: string): string {
+  return styles
+    .replace(/@import[\s\S]*?;/gi, '')
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/behavior\s*:[^;{}]+;?/gi, '')
+    .replace(/-moz-binding\s*:[^;{}]+;?/gi, '')
+    .replace(/url\s*\(\s*["']?\s*javascript:[^)]*\)/gi, '')
+    .trim();
 }
