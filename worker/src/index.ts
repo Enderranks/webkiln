@@ -1462,7 +1462,7 @@ app.get('/api/sites/:siteId/project', async (c) => {
 });
 
 app.put('/api/sites/:siteId/project', async (c) => {
-  const record = await getSiteAccess(c, 'editor');
+  const record = await getSiteAccess(c, 'content');
   if ('error' in record) return record.response;
   const body = await c.req.json<{
     project?: {
@@ -1480,6 +1480,28 @@ app.put('/api/sites/:siteId/project', async (c) => {
     return jsonError(c, 409, 'REVISION_MISMATCH', 'The project changed on the server');
   const now = new Date();
   const db = getDb(c.env.DB);
+  if (canonicalRole(record.membership.role) === 'content_editor') {
+    const permissions = await db
+      .select()
+      .from(pagePermission)
+      .where(eq(pagePermission.siteId, record.site.id))
+      .all();
+    const allowedPages = new Set(
+      permissions
+        .filter(
+          (item) =>
+            item.userId === record.user.id && ['content_editor', 'designer'].includes(item.role),
+        )
+        .map((item) => item.pageId),
+    );
+    if ((body.project.pages ?? []).some((item) => !allowedPages.has(String(item.id))))
+      return jsonError(
+        c,
+        403,
+        'FORBIDDEN',
+        'Content editor does not have permission for every page',
+      );
+  }
   const nextRevision = record.site.currentRevision + 1;
   const pageUpdates = (body.project.pages ?? []).map((item, index) =>
     db
@@ -2143,7 +2165,10 @@ function replaceAssetReferences(value: unknown, from: string, to: string): unkno
 function accessUser(record: { user: { id: string } }) {
   return record.user;
 }
-async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'editor' | 'owner') {
+async function getSiteAccess(
+  c: Context<{ Bindings: Env }>,
+  role: 'viewer' | 'editor' | 'content' | 'owner',
+) {
   const user = await currentUser(c);
   if (!user)
     return { error: true, response: jsonError(c, 401, 'UNAUTHENTICATED', 'Sign in required') };
@@ -2158,6 +2183,11 @@ async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'ed
   if (!record) return { error: true, response: jsonError(c, 404, 'NOT_FOUND', 'Site not found') };
   if (role === 'editor' && !roleAllows(record.membership.role, 'design'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Editor access required') };
+  if (role === 'content' && !roleAllows(record.membership.role, 'content'))
+    return {
+      error: true,
+      response: jsonError(c, 403, 'FORBIDDEN', 'Content editor access required'),
+    };
   if (role === 'owner' && !roleAllows(record.membership.role, 'owner'))
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Owner access required') };
   return { ...record, user };
