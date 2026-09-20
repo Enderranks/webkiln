@@ -109,18 +109,34 @@ export const siteRevision = sqliteTable(
   }),
 );
 
-export const assetMetadata = sqliteTable('asset_metadata', {
-  id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').notNull(),
-  siteId: text('site_id').notNull(),
-  filename: text('filename').notNull(),
-  mimeType: text('mime_type').notNull(),
-  size: integer('size').notNull(),
-  altText: text('alt_text').notNull().default(''),
-  storageStatus: text('storage_status').notNull().default('metadata_only'),
-  createdBy: text('created_by').notNull(),
-  ...timestamps,
-});
+export const assetMetadata = sqliteTable(
+  'asset_metadata',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').notNull(),
+    siteId: text('site_id').notNull(),
+    filename: text('filename').notNull(),
+    mimeType: text('mime_type').notNull(),
+    size: integer('size').notNull(),
+    altText: text('alt_text').notNull().default(''),
+    caption: text('caption').notNull().default(''),
+    folder: text('folder').notNull().default('/'),
+    tags: text('tags').notNull().default('[]'),
+    focalPoint: text('focal_point').notNull().default('{"x":50,"y":50}'),
+    width: integer('width'),
+    height: integer('height'),
+    contentHash: text('content_hash'),
+    brandGroup: text('brand_group'),
+    usageCount: integer('usage_count').notNull().default(0),
+    storageStatus: text('storage_status').notNull().default('metadata_only'),
+    createdBy: text('created_by').notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    workspaceLookup: index('asset_metadata_workspace_lookup').on(table.workspaceId),
+    hashLookup: index('asset_metadata_hash_lookup').on(table.workspaceId, table.contentHash),
+  }),
+);
 
 export const cmsCollection = sqliteTable(
   'cms_collection',

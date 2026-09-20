@@ -1,0 +1,11 @@
+ALTER TABLE asset_metadata ADD COLUMN caption TEXT NOT NULL DEFAULT '';
+ALTER TABLE asset_metadata ADD COLUMN folder TEXT NOT NULL DEFAULT '/';
+ALTER TABLE asset_metadata ADD COLUMN tags TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE asset_metadata ADD COLUMN focal_point TEXT NOT NULL DEFAULT '{"x":50,"y":50}';
+ALTER TABLE asset_metadata ADD COLUMN width INTEGER;
+ALTER TABLE asset_metadata ADD COLUMN height INTEGER;
+ALTER TABLE asset_metadata ADD COLUMN content_hash TEXT;
+ALTER TABLE asset_metadata ADD COLUMN brand_group TEXT;
+ALTER TABLE asset_metadata ADD COLUMN usage_count INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS asset_metadata_workspace_lookup ON asset_metadata(workspace_id);
+CREATE INDEX IF NOT EXISTS asset_metadata_hash_lookup ON asset_metadata(workspace_id, content_hash);

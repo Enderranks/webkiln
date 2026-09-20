@@ -6,6 +6,7 @@ import { getAuth } from './auth';
 import { getDb } from './db/client';
 import {
   auditEvent,
+  assetMetadata,
   cmsCollection,
   cmsField,
   cmsRecord,
@@ -2102,6 +2103,38 @@ function toCloudSite(item: typeof site.$inferSelect, pageCount: number, user: { 
     updatedBy: user.id,
   };
 }
+function toAsset(item: typeof assetMetadata.$inferSelect) {
+  return {
+    id: item.id,
+    workspaceId: item.workspaceId,
+    siteId: item.siteId,
+    filename: item.filename,
+    mimeType: item.mimeType,
+    size: item.size,
+    altText: item.altText,
+    caption: item.caption,
+    folder: item.folder,
+    tags: jsonValue(item.tags, []),
+    focalPoint: jsonValue(item.focalPoint, { x: 50, y: 50 }),
+    width: item.width,
+    height: item.height,
+    contentHash: item.contentHash,
+    brandGroup: item.brandGroup,
+    usageCount: item.usageCount,
+    storageStatus: item.storageStatus,
+    createdAt: new Date(item.createdAt).toISOString(),
+    updatedAt: new Date(item.updatedAt).toISOString(),
+    transformations: { available: false, reason: 'Image processing is not configured' },
+  };
+}
+function replaceAssetReferences(value: unknown, from: string, to: string): unknown {
+  if (typeof value === 'string') return value === from ? to : value;
+  if (Array.isArray(value)) return value.map((item) => replaceAssetReferences(item, from, to));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, replaceAssetReferences(item, from, to)]),
+  );
+}
 function accessUser(record: { user: { id: string } }) {
   return record.user;
 }
@@ -2125,6 +2158,248 @@ async function getSiteAccess(c: Context<{ Bindings: Env }>, role: 'viewer' | 'ed
     return { error: true, response: jsonError(c, 403, 'FORBIDDEN', 'Owner access required') };
   return { ...record, user };
 }
+
+app.get('/api/workspaces/:workspaceId/assets', async (c) => {
+  const access = await requireMembership(c, c.req.param('workspaceId'), [
+    'owner',
+    'admin',
+    'editor',
+    'viewer',
+  ]);
+  if (access.error === 'UNAUTHENTICATED')
+    return jsonError(c, 401, access.error, 'Sign in required');
+  if (access.error === 'FORBIDDEN')
+    return jsonError(c, 403, access.error, 'Workspace access required');
+  const rows = await getDb(c.env.DB)
+    .select()
+    .from(assetMetadata)
+    .where(eq(assetMetadata.workspaceId, c.req.param('workspaceId')))
+    .all();
+  const query = (c.req.query('q') ?? '').trim().toLowerCase();
+  const type = c.req.query('type');
+  const folder = c.req.query('folder');
+  const sort = c.req.query('sort') ?? 'updated';
+  const filtered = rows
+    .filter(
+      (item) =>
+        !query ||
+        `${item.filename} ${item.altText} ${item.caption} ${item.tags}`
+          .toLowerCase()
+          .includes(query),
+    )
+    .filter((item) => !type || item.mimeType.startsWith(type))
+    .filter((item) => !folder || item.folder === folder)
+    .sort((a, b) =>
+      sort === 'name'
+        ? a.filename.localeCompare(b.filename)
+        : sort === 'size'
+          ? b.size - a.size
+          : b.updatedAt.getTime() - a.updatedAt.getTime(),
+    );
+  return c.json(filtered.slice(0, 200).map(toAsset));
+});
+
+app.post('/api/workspaces/:workspaceId/assets', async (c) => {
+  const workspaceId = c.req.param('workspaceId');
+  const access = await requireMembership(c, workspaceId, ['owner', 'admin', 'editor']);
+  if (access.error === 'UNAUTHENTICATED')
+    return jsonError(c, 401, access.error, 'Sign in required');
+  if (access.error === 'FORBIDDEN')
+    return jsonError(c, 403, access.error, 'Editor access required');
+  const body = await c.req.json<{
+    siteId?: string;
+    filename?: string;
+    mimeType?: string;
+    size?: number;
+    altText?: string;
+    caption?: string;
+    folder?: string;
+    tags?: string[];
+    focalPoint?: { x: number; y: number };
+    width?: number;
+    height?: number;
+    contentHash?: string;
+    brandGroup?: string;
+  }>();
+  if (
+    !body.siteId ||
+    !body.filename ||
+    !body.mimeType ||
+    !Number.isFinite(body.size) ||
+    body.size! < 0
+  )
+    return jsonError(c, 400, 'VALIDATION_ERROR', 'Asset metadata is incomplete');
+  const siteRecord = await getDb(c.env.DB)
+    .select()
+    .from(site)
+    .where(and(eq(site.id, body.siteId), eq(site.workspaceId, workspaceId)))
+    .get();
+  if (!siteRecord) return jsonError(c, 404, 'NOT_FOUND', 'Site not found');
+  const now = new Date();
+  const id = crypto.randomUUID();
+  await getDb(c.env.DB)
+    .insert(assetMetadata)
+    .values({
+      id,
+      workspaceId,
+      siteId: body.siteId,
+      filename: body.filename.slice(0, 240),
+      mimeType: body.mimeType.slice(0, 120),
+      size: Math.round(body.size!),
+      altText: body.altText?.slice(0, 500) ?? '',
+      caption: body.caption?.slice(0, 500) ?? '',
+      folder: body.folder?.slice(0, 200) || '/',
+      tags: JSON.stringify((body.tags ?? []).slice(0, 30)),
+      focalPoint: JSON.stringify(body.focalPoint ?? { x: 50, y: 50 }),
+      width: body.width ?? null,
+      height: body.height ?? null,
+      contentHash: body.contentHash?.slice(0, 128) ?? null,
+      brandGroup: body.brandGroup?.slice(0, 120) ?? null,
+      storageStatus: 'metadata_only',
+      createdBy: access.user.id,
+      createdAt: now,
+      updatedAt: now,
+    });
+  return c.json(
+    toAsset(
+      (await getDb(c.env.DB).select().from(assetMetadata).where(eq(assetMetadata.id, id)).get())!,
+    ),
+    201,
+  );
+});
+
+app.patch('/api/assets/:assetId', async (c) => {
+  const existing = await getDb(c.env.DB)
+    .select()
+    .from(assetMetadata)
+    .where(eq(assetMetadata.id, c.req.param('assetId')))
+    .get();
+  if (!existing) return jsonError(c, 404, 'NOT_FOUND', 'Asset not found');
+  const access = await requireMembership(c, existing.workspaceId, ['owner', 'admin', 'editor']);
+  if (access.error === 'UNAUTHENTICATED')
+    return jsonError(c, 401, access.error, 'Sign in required');
+  if (access.error === 'FORBIDDEN')
+    return jsonError(c, 403, access.error, 'Editor access required');
+  const body = await c.req.json<{
+    altText?: string;
+    caption?: string;
+    folder?: string;
+    tags?: string[];
+    focalPoint?: { x: number; y: number };
+    brandGroup?: string;
+  }>();
+  await getDb(c.env.DB)
+    .update(assetMetadata)
+    .set({
+      altText: body.altText?.slice(0, 500) ?? existing.altText,
+      caption: body.caption?.slice(0, 500) ?? existing.caption,
+      folder: body.folder?.slice(0, 200) || existing.folder,
+      tags: JSON.stringify((body.tags ?? jsonValue(existing.tags, [])).slice(0, 30)),
+      focalPoint: JSON.stringify(
+        body.focalPoint ?? jsonValue(existing.focalPoint, { x: 50, y: 50 }),
+      ),
+      brandGroup: body.brandGroup?.slice(0, 120) ?? existing.brandGroup,
+      updatedAt: new Date(),
+    })
+    .where(eq(assetMetadata.id, existing.id));
+  return c.json(
+    toAsset(
+      (await getDb(c.env.DB)
+        .select()
+        .from(assetMetadata)
+        .where(eq(assetMetadata.id, existing.id))
+        .get())!,
+    ),
+  );
+});
+
+app.delete('/api/assets/:assetId', async (c) => {
+  const existing = await getDb(c.env.DB)
+    .select()
+    .from(assetMetadata)
+    .where(eq(assetMetadata.id, c.req.param('assetId')))
+    .get();
+  if (!existing) return jsonError(c, 404, 'NOT_FOUND', 'Asset not found');
+  const access = await requireMembership(c, existing.workspaceId, ['owner', 'admin']);
+  if (access.error === 'UNAUTHENTICATED')
+    return jsonError(c, 401, access.error, 'Sign in required');
+  if (access.error === 'FORBIDDEN')
+    return jsonError(c, 403, access.error, 'Owner or admin access required');
+  if (existing.usageCount > 0)
+    return jsonError(
+      c,
+      409,
+      'ASSET_IN_USE',
+      'Asset is still used by a project; replace usages before deleting',
+    );
+  await getDb(c.env.DB).delete(assetMetadata).where(eq(assetMetadata.id, existing.id));
+  return c.body(null, 204);
+});
+
+app.post('/api/assets/:assetId/replace', async (c) => {
+  const existing = await getDb(c.env.DB)
+    .select()
+    .from(assetMetadata)
+    .where(eq(assetMetadata.id, c.req.param('assetId')))
+    .get();
+  if (!existing) return jsonError(c, 404, 'NOT_FOUND', 'Asset not found');
+  const access = await requireMembership(c, existing.workspaceId, ['owner', 'admin', 'editor']);
+  if (access.error === 'UNAUTHENTICATED')
+    return jsonError(c, 401, access.error, 'Sign in required');
+  if (access.error === 'FORBIDDEN')
+    return jsonError(c, 403, access.error, 'Editor access required');
+  const body = await c.req.json<{ replacementAssetId?: string }>();
+  const replacement = body.replacementAssetId
+    ? await getDb(c.env.DB)
+        .select()
+        .from(assetMetadata)
+        .where(
+          and(
+            eq(assetMetadata.id, body.replacementAssetId),
+            eq(assetMetadata.workspaceId, existing.workspaceId),
+          ),
+        )
+        .get()
+    : null;
+  if (!replacement)
+    return jsonError(
+      c,
+      400,
+      'VALIDATION_ERROR',
+      'Replacement asset must belong to the same workspace',
+    );
+  const pages = await getDb(c.env.DB)
+    .select()
+    .from(page)
+    .innerJoin(site, eq(page.siteId, site.id))
+    .where(and(eq(site.workspaceId, existing.workspaceId), isNull(page.deletedAt)))
+    .all();
+  let replaced = 0;
+  for (const row of pages) {
+    const before = JSON.stringify(row.page.projectData);
+    const next = replaceAssetReferences(
+      JSON.parse(row.page.projectData),
+      existing.id,
+      replacement.id,
+    );
+    if (JSON.stringify(next) !== before) {
+      replaced += 1;
+      await getDb(c.env.DB)
+        .update(page)
+        .set({ projectData: JSON.stringify(next), updatedAt: new Date() })
+        .where(eq(page.id, row.page.id));
+    }
+  }
+  await getDb(c.env.DB)
+    .update(assetMetadata)
+    .set({ usageCount: 0, updatedAt: new Date() })
+    .where(eq(assetMetadata.id, existing.id));
+  await getDb(c.env.DB)
+    .update(assetMetadata)
+    .set({ usageCount: replacement.usageCount + replaced, updatedAt: new Date() })
+    .where(eq(assetMetadata.id, replacement.id));
+  return c.json({ replacedPages: replaced, replacementAssetId: replacement.id });
+});
 
 app.onError((error, c) => {
   console.error(JSON.stringify({ event: 'worker_error', message: error.message }));

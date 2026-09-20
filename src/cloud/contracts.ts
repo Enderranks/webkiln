@@ -139,6 +139,28 @@ export interface FormSubmission {
   status: string;
   createdAt: string;
 }
+export interface AssetMetadata {
+  id: string;
+  workspaceId: string;
+  siteId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  altText: string;
+  caption: string;
+  folder: string;
+  tags: string[];
+  focalPoint: { x: number; y: number };
+  width?: number | null;
+  height?: number | null;
+  contentHash?: string | null;
+  brandGroup?: string | null;
+  usageCount: number;
+  storageStatus: 'local' | 'metadata_only' | 'available' | 'unavailable';
+  transformations: { available: boolean; reason?: string };
+  createdAt: string;
+  updatedAt: string;
+}
 export interface AutomationGraph {
   conditions: Array<{ field: string; operator: string; value?: string }>;
   actions: Array<{ type: string; config: Record<string, unknown> }>;
