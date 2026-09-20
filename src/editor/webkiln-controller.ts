@@ -1155,8 +1155,23 @@ export class WebKilnEditorController {
 
   private bindCustomCode(): void {
     const modal = document.querySelector<HTMLElement>('#codeModal');
+    const input = document.querySelector<HTMLTextAreaElement>('#codeInput');
+    const keys = ['html', 'css', 'javascript'] as const;
+    let activeKey: (typeof keys)[number] = 'html';
+    const syncInput = () => {
+      if (input) input.value = this.project.customCode[activeKey] ?? '';
+      document.querySelectorAll<HTMLButtonElement>('.code-tabs button').forEach((button, index) => {
+        button.classList.toggle('active', keys[index] === activeKey);
+      });
+    };
+    const storeInput = () => {
+      if (input) this.project.customCode[activeKey] = input.value;
+    };
     document.querySelector('#codeEditorBtn')?.addEventListener('click', () => {
+      activeKey = 'html';
+      syncInput();
       if (modal) modal.hidden = false;
+      input?.focus();
     });
     document.querySelector('#closeCode')?.addEventListener('click', () => {
       if (modal) modal.hidden = true;
@@ -1164,9 +1179,16 @@ export class WebKilnEditorController {
     document.querySelector('#cancelCode')?.addEventListener('click', () => {
       if (modal) modal.hidden = true;
     });
+    document.querySelectorAll<HTMLButtonElement>('.code-tabs button').forEach((button, index) => {
+      button.addEventListener('click', () => {
+        storeInput();
+        activeKey = keys[index] ?? 'html';
+        syncInput();
+        input?.focus();
+      });
+    });
     document.querySelector('#saveCode')?.addEventListener('click', () => {
-      this.project.customCode.html =
-        document.querySelector<HTMLTextAreaElement>('#codeInput')?.value ?? '';
+      storeInput();
       this.project.customCode.isolated = true;
       this.storage.save(this.project);
       if (modal) modal.hidden = true;

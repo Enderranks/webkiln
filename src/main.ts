@@ -293,13 +293,20 @@ function renderAccountMenu(client: WebKilnApiClient): void {
   menu.innerHTML =
     '<summary aria-label="Open account menu">Account</summary><div class="account-popover"><span data-account-loading>Loading account…</span><a href="/dashboard">Dashboard</a><button type="button" data-editor-signout>Sign out</button></div>';
   actions.append(menu);
-  void client.getSession().then((session) => {
-    const loading = menu.querySelector('[data-account-loading]');
-    if (loading)
-      loading.innerHTML = session
-        ? `<strong>${escapeHtml(session.user.displayName)}</strong><small>${escapeHtml(session.user.email)}</small><em>● Cloud connected</em>`
-        : '<strong>Signed out</strong>';
-  });
+  void client
+    .getSession()
+    .then((session) => {
+      const loading = menu.querySelector('[data-account-loading]');
+      if (loading)
+        loading.innerHTML = session
+          ? `<strong>${escapeHtml(session.user.displayName)}</strong><small>${escapeHtml(session.user.email)}</small><em>● Cloud connected</em>`
+          : '<strong>Signed out</strong>';
+    })
+    .catch(() => {
+      const loading = menu.querySelector('[data-account-loading]');
+      if (loading)
+        loading.innerHTML = '<strong>Cloud unavailable</strong><small>Local editor mode</small>';
+    });
   menu.querySelector('[data-editor-signout]')?.addEventListener('click', async () => {
     await client.signOut().catch(() => undefined);
     navigate('/login');

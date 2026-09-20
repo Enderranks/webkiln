@@ -61,6 +61,27 @@ test.describe('WebKiln platform quality', () => {
     await expect(page.locator('[data-command="add-section"]')).toHaveCount(0);
   });
 
+  test('custom code tabs preserve isolated HTML, CSS, and JavaScript drafts', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Custom code is exposed through the desktop Site panel');
+    await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.editorEngine === 'webkiln');
+    await page.locator('.rail-tab[data-panel="site"]').click();
+    await page.locator('#codeEditorBtn').click();
+    const input = page.locator('#codeInput');
+    await input.fill('<main>Markup</main>');
+    await page.locator('.code-tabs button').nth(1).click();
+    await input.fill('body { color: red; }');
+    await page.locator('.code-tabs button').nth(2).click();
+    await input.fill('console.log("isolated");');
+    await page.locator('.code-tabs button').nth(0).click();
+    await expect(input).toHaveValue('<main>Markup</main>');
+    await page.locator('#saveCode').click();
+    await expect(page.locator('#codeModal')).toBeHidden();
+  });
+
   test('protected cloud routes reject unauthenticated access', async ({ request }) => {
     test.skip(!process.env.WEBKILN_E2E_BASE_URL, 'Requires a deployed Worker base URL');
     const response = await request.get('/api/workspaces/no-workspace/members');

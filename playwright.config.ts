@@ -19,7 +19,7 @@ export default defineConfig({
   webServer: process.env.WEBKILN_E2E_BASE_URL
     ? undefined
     : {
-        command: 'npm run preview -- --host 127.0.0.1',
+        command: 'npm run build && npm run preview -- --host 127.0.0.1',
         url: 'http://127.0.0.1:4173',
         reuseExistingServer: true,
       },
