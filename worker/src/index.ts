@@ -406,8 +406,28 @@ async function runAutomations(
       attempts += 1;
       try {
         for (const action of graph.actions ?? []) {
-          if (action.type === 'email') throw new Error('Email provider not connected');
-          if (action.type === 'webhook') {
+          if (action.type === 'store-submission') {
+            if (!payload.submissionId) throw new Error('No form submission is available to store');
+            continue;
+          }
+          if (action.type === 'log-event') {
+            await db.insert(auditEvent).values({
+              id: crypto.randomUUID(),
+              workspaceId,
+              userId: flow.createdBy,
+              action: 'automation.event_logged',
+              resourceType: 'automation',
+              resourceId: flow.id,
+              metadata: JSON.stringify({
+                triggerType,
+                eventId,
+                label: String(action.config?.value ?? 'Automation event'),
+              }),
+              createdAt: new Date(),
+            });
+            continue;
+          }
+          if (action.type === 'call-webhook') {
             const url = String(action.config.url ?? '');
             if (!/^https:\/\//i.test(url))
               throw new Error('Approved webhook requires an https URL');
@@ -417,7 +437,9 @@ async function runAutomations(
               body: JSON.stringify(payload),
               signal: AbortSignal.timeout(5000),
             });
+            continue;
           }
+          throw new Error(`Action ${action.type} is not available in this environment`);
         }
         succeeded = true;
       } catch (caught) {
