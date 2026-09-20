@@ -44,6 +44,69 @@ import type { WebKilnProject } from '../../src/types';
 const app = new Hono<{ Bindings: Env }>();
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_FORM_BYTES = 512 * 1024;
+const AUTOMATION_TRIGGERS = new Set([
+  'form.submitted',
+  'site.published',
+  'site.unpublished',
+  'collection.record_created',
+  'collection.record_updated',
+  'revision.created',
+]);
+const AUTOMATION_ACTIONS = new Set([
+  'store-submission',
+  'create-record',
+  'update-record',
+  'add-notification',
+  'call-webhook',
+  'change-banner',
+  'log-event',
+]);
+function validateAutomationInput(graph: unknown, retryPolicy?: unknown): string | null {
+  if (!graph || typeof graph !== 'object') return 'An automation graph is required';
+  const value = graph as { conditions?: unknown; actions?: unknown };
+  if (!Array.isArray(value.conditions) || !Array.isArray(value.actions))
+    return 'Automation conditions and actions are required';
+  if (value.conditions.length > 10 || value.actions.length > 10)
+    return 'Automations are limited to 10 conditions and 10 actions';
+  if (
+    value.conditions.some(
+      (item) =>
+        !item ||
+        typeof item !== 'object' ||
+        typeof (item as { field?: unknown }).field !== 'string' ||
+        !(item as { field: string }).field.trim() ||
+        typeof (item as { operator?: unknown }).operator !== 'string' ||
+        !(item as { operator: string }).operator.trim(),
+    )
+  )
+    return 'Each condition needs a field and operator';
+  if (
+    value.actions.some(
+      (item) =>
+        !item ||
+        typeof item !== 'object' ||
+        typeof (item as { type?: unknown }).type !== 'string' ||
+        !AUTOMATION_ACTIONS.has((item as { type: string }).type),
+    )
+  )
+    return 'Each action must use an approved action type';
+  if (retryPolicy !== undefined) {
+    if (!retryPolicy || typeof retryPolicy !== 'object') return 'Retry policy is invalid';
+    const policy = retryPolicy as { maxAttempts?: unknown; backoffSeconds?: unknown };
+    if (
+      typeof policy.maxAttempts !== 'number' ||
+      !Number.isInteger(policy.maxAttempts) ||
+      policy.maxAttempts < 0 ||
+      policy.maxAttempts > 5 ||
+      typeof policy.backoffSeconds !== 'number' ||
+      !Number.isInteger(policy.backoffSeconds) ||
+      policy.backoffSeconds < 0 ||
+      policy.backoffSeconds > 3600
+    )
+      return 'Retry policy must use 0–5 attempts and 0–3600 seconds backoff';
+  }
+  return null;
+}
 const jsonError = (
   c: Context<{ Bindings: Env }>,
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429 | 500,
@@ -973,20 +1036,19 @@ app.post('/api/workspaces/:workspaceId/automations', async (c) => {
     triggerType?: string;
     graph?: { conditions?: unknown[]; actions?: unknown[] };
   }>();
-  const allowed = [
-    'form.submitted',
-    'site.published',
-    'site.unpublished',
-    'collection.record.created',
-    'collection.record.updated',
-  ];
-  if (!body.name?.trim() || !body.triggerType || !allowed.includes(body.triggerType))
+  if (!body.name?.trim() || !body.triggerType || !AUTOMATION_TRIGGERS.has(body.triggerType))
     return jsonError(
       c,
       400,
       'VALIDATION_ERROR',
       'Automation name and supported trigger are required',
     );
+  const graph = {
+    conditions: body.graph?.conditions ?? [],
+    actions: body.graph?.actions ?? [],
+  };
+  const graphError = validateAutomationInput(graph);
+  if (graphError) return jsonError(c, 400, 'VALIDATION_ERROR', graphError);
   const id = crypto.randomUUID();
   const now = new Date();
   await getDb(c.env.DB)
@@ -996,10 +1058,7 @@ app.post('/api/workspaces/:workspaceId/automations', async (c) => {
       workspaceId: c.req.param('workspaceId'),
       name: body.name.trim(),
       triggerType: body.triggerType,
-      graph: JSON.stringify({
-        conditions: body.graph?.conditions ?? [],
-        actions: body.graph?.actions ?? [],
-      }),
+      graph: JSON.stringify(graph),
       status: 'draft',
       createdBy: access.user.id,
       createdAt: now,
@@ -1039,6 +1098,13 @@ app.patch('/api/automations/:automationId', async (c) => {
     !row.flow.graph
   )
     return jsonError(c, 400, 'VALIDATION_ERROR', 'An automation graph is required');
+  if (body.graph) {
+    const graphError = validateAutomationInput(body.graph, body.retryPolicy);
+    if (graphError) return jsonError(c, 400, 'VALIDATION_ERROR', graphError);
+  } else if (body.retryPolicy !== undefined) {
+    const retryError = validateAutomationInput(row.flow.graph, body.retryPolicy);
+    if (retryError) return jsonError(c, 400, 'VALIDATION_ERROR', retryError);
+  }
   await getDb(c.env.DB)
     .update(automation)
     .set({

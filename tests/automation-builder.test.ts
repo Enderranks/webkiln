@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateAutomationGraph } from '../src/cloud/automation-builder';
+import { AUTOMATION_TRIGGERS, validateAutomationGraph } from '../src/cloud/automation-builder';
 
 describe('visual automation builder validation', () => {
   it('requires valid condition and action nodes', () => {
@@ -15,5 +15,9 @@ describe('visual automation builder validation', () => {
         actions: Array.from({ length: 11 }, () => ({ type: 'log-event', config: {} })),
       }),
     ).toContain('limited');
+  });
+
+  it('keeps the revision trigger in the shared visual trigger contract', () => {
+    expect(AUTOMATION_TRIGGERS).toContain('revision.created');
   });
 });
