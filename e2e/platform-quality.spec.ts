@@ -54,6 +54,7 @@ test.describe('WebKiln platform quality', () => {
   test('laptop breakpoint preview is selectable', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Breakpoint toolbar is desktop-only');
     await page.goto('/');
+    await page.waitForFunction(() => document.documentElement.dataset.editorEngine === 'webkiln');
     await page.locator('.device[data-width="laptop"]').click();
     await expect(page.locator('#canvasSizeStatus')).toHaveText(/Canvas \d+ px/);
     await expect(page.locator('.device[data-width="laptop"]')).toHaveClass(/active/);
