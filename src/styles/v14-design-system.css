@@ -28,6 +28,35 @@
   border-radius: 6px;
   padding: 7px;
 }
+.token-row label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.token-row label > span {
+  min-width: 0;
+}
+.token-usage {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: inherit;
+}
+.token-usage:hover,
+.token-usage:focus-visible {
+  text-decoration: underline;
+}
+.token-row > .mini-btn {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
 .token-row strong,
 .token-row small {
   display: block;

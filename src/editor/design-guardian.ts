@@ -2,7 +2,9 @@ import { createDefaultEditorSettings } from '../models/project-schema';
 import type { DesignSystem, WebKilnProject } from '../types';
 import {
   healthScores,
+  findTokenUsages,
   normalizeDesignSystem,
+  replaceTokenAcrossSite,
   scanDesignGuardian,
   tokenCss,
   tokenUsageCount,
@@ -31,13 +33,45 @@ export class DesignGuardianController {
     const card = document.createElement('section');
     card.dataset.v14Panel = 'true';
     card.className = 'v14-health-card';
-    card.innerHTML = `<div class="v14-head"><div><p class="eyebrow">V14 system</p><h3>Design system</h3></div><div class="v14-head-actions"><button class="ghost-btn" type="button" data-theme-import>Import</button><button class="ghost-btn" type="button" data-theme-export>Export</button><input type="file" accept="application/json" data-theme-file hidden /></div></div><p class="panel-note">Tokens keep colors, type, spacing, controls, motion, and layout consistent across the site.</p><div class="token-list">${this.system.tokens.map((token) => `<label class="token-row"><span><strong>${token.name}</strong><small>${token.category} · ${tokenUsageCount(this.project, token)} uses</small></span><input data-token="${token.name}" value="${token.value}" aria-label="${token.name}" /></label>`).join('')}</div><div class="v14-actions"><button class="primary-btn" type="button" data-run-guardian>Run Design Guardian</button><button class="ghost-btn" type="button" data-run-health>Site Health Center</button></div><div data-v14-results aria-live="polite"></div>`;
+    card.innerHTML = `<div class="v14-head"><div><p class="eyebrow">V14 system</p><h3>Design system</h3></div><div class="v14-head-actions"><button class="ghost-btn" type="button" data-theme-import>Import</button><button class="ghost-btn" type="button" data-theme-export>Export</button><input type="file" accept="application/json" data-theme-file hidden /></div></div><p class="panel-note">Tokens keep colors, type, spacing, controls, motion, and layout consistent across the site.</p><div class="token-list">${this.system.tokens.map((token) => `<div class="token-row"><label><span><strong>${token.name}</strong><small>${token.category} · <button type="button" class="token-usage" data-token-usage="${token.name}">${tokenUsageCount(this.project, token)} uses</button></small></span><input data-token="${token.name}" value="${token.value}" aria-label="${token.name}" /></label><button type="button" class="mini-btn" data-token-replace="${token.name}" aria-label="Replace ${token.name} across site">↻</button></div>`).join('')}</div><div class="v14-actions"><button class="primary-btn" type="button" data-run-guardian>Run Design Guardian</button><button class="ghost-btn" type="button" data-run-health>Site Health Center</button></div><div data-v14-results aria-live="polite"></div>`;
     panel.append(card);
     card.querySelectorAll<HTMLInputElement>('[data-token]').forEach((input) =>
       input.addEventListener('change', () => {
         const token = this.system.tokens.find((item) => item.name === input.dataset.token);
         if (token) token.value = input.value;
         this.persist();
+      }),
+    );
+    card.querySelectorAll<HTMLButtonElement>('[data-token-usage]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const token = this.system.tokens.find((item) => item.name === button.dataset.tokenUsage);
+        if (!token) return;
+        const usages = findTokenUsages(this.project, token);
+        this.showTokenResult(
+          card,
+          usages.length
+            ? usages.map((item) => `${item.pageName}: ${item.count}`).join(' · ')
+            : 'No page content uses this value yet.',
+        );
+      }),
+    );
+    card.querySelectorAll<HTMLButtonElement>('[data-token-replace]').forEach((button) =>
+      button.addEventListener('click', () => {
+        const token = this.system.tokens.find((item) => item.name === button.dataset.tokenReplace);
+        if (!token) return;
+        const replacement = window.prompt(
+          `Replace ${token.value} across the site with:`,
+          token.value,
+        );
+        if (replacement === null || replacement === token.value) return;
+        if (!window.confirm(`Replace every use of ${token.value} in page content?`)) return;
+        const result = replaceTokenAcrossSite(this.project, token, replacement);
+        this.project.pages = result.project.pages;
+        this.persist();
+        this.showTokenResult(
+          card,
+          `${result.replacements} replacement${result.replacements === 1 ? '' : 's'} applied across page content.`,
+        );
       }),
     );
     card
@@ -66,6 +100,10 @@ export class DesignGuardianController {
           this.toast('Theme import failed', 'Choose a valid WebKiln theme JSON file.');
         }
       });
+  }
+  private showTokenResult(card: HTMLElement, message: string): void {
+    const results = card.querySelector<HTMLElement>('[data-v14-results]');
+    if (results) results.innerHTML = `<p class="health-good">${message}</p>`;
   }
   private persist(): void {
     this.project.editorSettings!.designSystem = this.system;

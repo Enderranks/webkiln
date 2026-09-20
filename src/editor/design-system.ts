@@ -39,6 +39,86 @@ export function normalizeDesignSystem(value?: Partial<DesignSystem>): DesignSyst
 export function tokenUsageCount(project: WebKilnProject, token: DesignToken): number {
   return JSON.stringify(project).toLowerCase().split(token.value.toLowerCase()).length - 1;
 }
+
+export interface TokenUsage {
+  pageId: string;
+  pageName: string;
+  count: number;
+}
+
+/**
+ * Reports where a token value is used in editable page data. The design-system
+ * definition itself is deliberately excluded so the report describes real
+ * site content rather than the token declaration.
+ */
+export function findTokenUsages(project: WebKilnProject, token: DesignToken): TokenUsage[] {
+  const needle = token.value.trim().toLowerCase();
+  if (!needle) return [];
+  return project.pages
+    .map((page) => {
+      const source = JSON.stringify(page.projectData ?? {}).toLowerCase();
+      return {
+        pageId: page.id,
+        pageName: page.name,
+        count: source.split(needle).length - 1,
+      };
+    })
+    .filter((usage) => usage.count > 0);
+}
+
+/** Replace a token value only in page content, never in token declarations. */
+export function replaceTokenAcrossSite(
+  project: WebKilnProject,
+  token: DesignToken,
+  replacement: string,
+): { project: WebKilnProject; replacements: number } {
+  const needle = token.value;
+  if (!needle) return { project, replacements: 0 };
+  const next = JSON.parse(JSON.stringify(project)) as WebKilnProject;
+  let replacements = 0;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(escaped, 'gi');
+  const replaceValue = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const matches = value.match(pattern);
+      replacements += matches?.length ?? 0;
+      return value.replace(pattern, () => replacement);
+    }
+    if (Array.isArray(value)) return value.map(replaceValue);
+    if (value && typeof value === 'object')
+      return Object.fromEntries(
+        Object.entries(value).map(([key, child]) => [key, replaceValue(child)]),
+      );
+    return value;
+  };
+  for (const page of next.pages) {
+    page.projectData = replaceValue(page.projectData ?? {}) as Record<string, unknown>;
+  }
+  return { project: next, replacements };
+}
+
+export function isValidTokenName(name: string): boolean {
+  return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/i.test(name.trim());
+}
+
+export function renameToken(
+  system: DesignSystem,
+  currentName: string,
+  nextName: string,
+): DesignSystem {
+  const normalized = nextName.trim();
+  if (!isValidTokenName(normalized))
+    throw new Error('Token names may use letters, numbers, dots, hyphens, and underscores.');
+  if (system.tokens.some((token) => token.name === normalized && token.name !== currentName)) {
+    throw new Error(`A token named "${normalized}" already exists.`);
+  }
+  return {
+    ...system,
+    tokens: system.tokens.map((token) =>
+      token.name === currentName ? { ...token, name: normalized } : token,
+    ),
+  };
+}
 export function tokenCss(system: DesignSystem): string {
   return `:root{${system.tokens.map((token) => `--wk-${token.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}:${token.value};`).join('')}}`;
 }
