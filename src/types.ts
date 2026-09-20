@@ -107,6 +107,9 @@ export interface SiteMetadata {
   description: string;
   language: string;
   timezone: string;
+  businessType?: string;
+  seoEnabled?: boolean;
+  analyticsPlaceholder?: boolean;
 }
 
 export interface PageDocument {

@@ -316,12 +316,30 @@
               <div><strong>Form</strong><small>Lead capture</small></div>
             </button>
             <p class="subheading">Smart sections</p>
-            <button class="component-row" data-component="features" type="button"><span>✦</span><div><strong>Feature grid</strong><small>Benefits and outcomes</small></div></button>
-            <button class="component-row" data-component="services" type="button"><span>◇</span><div><strong>Services</strong><small>Offerings and value</small></div></button>
-            <button class="component-row" data-component="testimonials" type="button"><span>“</span><div><strong>Testimonials</strong><small>Customer proof</small></div></button>
-            <button class="component-row" data-component="team" type="button"><span>◎</span><div><strong>Team</strong><small>People and roles</small></div></button>
-            <button class="component-row" data-component="blog" type="button"><span>▤</span><div><strong>Blog listing</strong><small>Stories and updates</small></div></button>
-            <button class="component-row" data-component="events" type="button"><span>◷</span><div><strong>Events</strong><small>Dates and availability</small></div></button>
+            <button class="component-row" data-component="features" type="button">
+              <span>✦</span>
+              <div><strong>Feature grid</strong><small>Benefits and outcomes</small></div>
+            </button>
+            <button class="component-row" data-component="services" type="button">
+              <span>◇</span>
+              <div><strong>Services</strong><small>Offerings and value</small></div>
+            </button>
+            <button class="component-row" data-component="testimonials" type="button">
+              <span>“</span>
+              <div><strong>Testimonials</strong><small>Customer proof</small></div>
+            </button>
+            <button class="component-row" data-component="team" type="button">
+              <span>◎</span>
+              <div><strong>Team</strong><small>People and roles</small></div>
+            </button>
+            <button class="component-row" data-component="blog" type="button">
+              <span>▤</span>
+              <div><strong>Blog listing</strong><small>Stories and updates</small></div>
+            </button>
+            <button class="component-row" data-component="events" type="button">
+              <span>◷</span>
+              <div><strong>Events</strong><small>Dates and availability</small></div>
+            </button>
           </div>
         </section>
 
@@ -563,10 +581,28 @@
               id="siteDescription"
               value="Fast, reliable servers for creators and communities."
           /></label>
+          ><label class="field"
+            >Language<select id="siteLanguage">
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+            </select></label
+          ><label class="field"
+            >Timezone<select id="siteTimezone">
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">Eastern Time</option>
+              <option value="America/Chicago">Central Time</option>
+              <option value="America/Denver">Mountain Time</option>
+              <option value="America/Los_Angeles">Pacific Time</option>
+            </select></label
+          >
         </div>
         <div class="setup-checks">
-          <label><input type="checkbox" checked /> Enable SEO basics</label
-          ><label><input type="checkbox" checked /> Add analytics placeholder</label
+          <label><input id="seoBasics" type="checkbox" checked /> Enable SEO basics</label
+          ><label
+            ><input id="analyticsPlaceholder" type="checkbox" checked /> Add analytics
+            placeholder</label
           ><label><input type="checkbox" /> Connect a custom domain later</label>
         </div>
         <div class="modal-actions">

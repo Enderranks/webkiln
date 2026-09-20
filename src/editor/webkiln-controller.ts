@@ -144,6 +144,7 @@ export class WebKilnEditorController {
       .querySelector('#checkpointBtn')
       ?.addEventListener('click', () => this.saveNow('Named checkpoint'));
     this.bindCustomCode();
+    this.bindSiteSetup();
     this.bindRecovery();
   }
 
@@ -1088,6 +1089,64 @@ export class WebKilnEditorController {
       this.storage.save(this.project);
       if (modal) modal.hidden = true;
       this.toast('Sandbox code saved', 'Custom code remains isolated from the editor shell.');
+    });
+  }
+
+  private bindSiteSetup(): void {
+    const modal = document.querySelector<HTMLElement>('#setupModal');
+    const open = () => {
+      const site = this.project.site;
+      const setValue = (id: string, value: string) => {
+        const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`);
+        if (input) input.value = value;
+      };
+      setValue('siteName', site.title);
+      setValue('siteDescription', site.description);
+      setValue('businessType', site.businessType ?? 'Hosting & infrastructure');
+      setValue('siteLanguage', site.language || 'en');
+      setValue('siteTimezone', site.timezone || 'UTC');
+      const seo = document.querySelector<HTMLInputElement>('#seoBasics');
+      const analytics = document.querySelector<HTMLInputElement>('#analyticsPlaceholder');
+      if (seo) seo.checked = site.seoEnabled !== false;
+      if (analytics) analytics.checked = site.analyticsPlaceholder !== false;
+      if (modal) modal.hidden = false;
+    };
+    document.querySelector('#openSiteSetup')?.addEventListener('click', open);
+    document.querySelector('#closeSetup')?.addEventListener('click', () => {
+      if (modal) modal.hidden = true;
+    });
+    document.querySelector('#cancelSetup')?.addEventListener('click', () => {
+      if (modal) modal.hidden = true;
+    });
+    document.querySelector('#saveSetup')?.addEventListener('click', () => {
+      const value = (id: string) =>
+        document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value.trim() ?? '';
+      const title = value('siteName');
+      if (!title) {
+        document.querySelector<HTMLInputElement>('#siteName')?.focus();
+        return;
+      }
+      this.project.site.title = title;
+      this.project.site.description = value('siteDescription');
+      this.project.site.businessType = value('businessType');
+      this.project.site.language = value('siteLanguage') || 'en';
+      this.project.site.timezone = value('siteTimezone') || 'UTC';
+      this.project.site.seoEnabled =
+        document.querySelector<HTMLInputElement>('#seoBasics')?.checked ?? true;
+      this.project.site.analyticsPlaceholder =
+        document.querySelector<HTMLInputElement>('#analyticsPlaceholder')?.checked ?? true;
+      const home = this.project.pages.find((page) => page.id === this.project.homepagePageId);
+      if (home && this.project.site.seoEnabled) {
+        home.seo = {
+          ...(home.seo ?? { title: title, description: '' }),
+          title,
+          description: this.project.site.description,
+        };
+      }
+      document.querySelector('.crumb span')?.replaceChildren(document.createTextNode(title));
+      if (modal) modal.hidden = true;
+      this.saveNow('Site settings updated');
+      this.toast('Site settings saved', 'SEO metadata and project identity were updated.');
     });
   }
 
