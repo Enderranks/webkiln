@@ -29,6 +29,41 @@ const sections = [
 ] as const;
 type Section = (typeof sections)[number];
 
+export type WebsiteFilter = 'all' | 'drafts' | 'published' | 'archived';
+export type WebsiteSort = 'recent' | 'name' | 'status';
+
+export function filterAndSortWebsites(
+  sites: CloudSite[],
+  query = '',
+  filter: WebsiteFilter = 'all',
+  sort: WebsiteSort = 'recent',
+): CloudSite[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  return sites
+    .filter((site) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        [site.name, site.slug, site.customDomain ?? ''].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        );
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'archived' && site.status === 'archived') ||
+        (filter === 'drafts' && site.status !== 'archived' && !site.published) ||
+        (filter === 'published' && site.status !== 'archived' && site.published === true);
+      return matchesQuery && matchesFilter;
+    })
+    .sort((left, right) => {
+      if (sort === 'name') return left.name.localeCompare(right.name);
+      if (sort === 'status') {
+        const statusOrder = (site: CloudSite) =>
+          site.status === 'archived' ? 2 : site.published ? 1 : 0;
+        return statusOrder(left) - statusOrder(right) || left.name.localeCompare(right.name);
+      }
+      return Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || '');
+    });
+}
+
 export async function renderDashboard(
   cloud: WebKilnApiClient,
   storage: LocalProjectStorage,
@@ -84,8 +119,29 @@ export async function renderDashboard(
     view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Analytics</p><h1>Understand what is ready.</h1><p>Calculated workspace signals are available now. Visitor analytics require a configured analytics provider and are not invented here.</p></div></div><div class="dashboard-stats"><div><small>Websites</small><strong>${sites.length}</strong><span>Calculated from workspace data</span></div><div><small>Published</small><strong>${sites.filter((site) => site.published).length}</strong><span>Calculated from deployment state</span></div><div><small>Pages</small><strong>${totalPages}</strong><span>Calculated from site metadata</span></div><div><small>Revisions</small><strong>${revisions}</strong><span>Calculated from saved revisions</span></div></div><section class="dashboard-panel analytics-panel"><div class="panel-title"><div><p class="eyebrow">Production measurements</p><h2>Analytics provider not connected</h2></div><span class="status-chip">Unavailable</span></div><p>WebKiln does not currently collect page views, visitors, conversion events, referrers, or performance telemetry. No external analytics script or paid observability service is enabled.</p><div class="analytics-unavailable-grid"><div><strong>Visitors</strong><small>Unavailable until an approved provider is configured.</small></div><div><strong>Conversions</strong><small>Unavailable until event tracking is explicitly enabled.</small></div><div><strong>Performance</strong><small>Use Site Health for calculated checks; production measurements remain unavailable.</small></div></div></section></div>`;
   };
   const renderWebsites = () => {
-    view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Websites</p><h1>Your websites</h1><p>Draft, publish, and manage every WebKiln experience from one place.</p></div><button class="primary-btn" data-create-site>New website</button></div><div class="website-toolbar"><label>Workspace<select data-workspace-select>${workspaces.map((workspace) => `<option value="${esc(workspace.id)}" ${workspace.id === selectedWorkspaceId ? 'selected' : ''}>${esc(workspace.name)}</option>`).join('')}</select></label><span>${sites.length} website${sites.length === 1 ? '' : 's'}</span></div><div class="website-grid">${sites.map(siteCard).join('') || empty('Your first website starts here', 'Choose a blank canvas or a template to get moving.')}</div>`;
+    view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Websites</p><h1>Your websites</h1><p>Draft, publish, and manage every WebKiln experience from one place.</p></div><button class="primary-btn" data-create-site>New website</button></div><div class="website-toolbar"><label>Workspace<select data-workspace-select>${workspaces.map((workspace) => `<option value="${esc(workspace.id)}" ${workspace.id === selectedWorkspaceId ? 'selected' : ''}>${esc(workspace.name)}</option>`).join('')}</select></label><label class="website-search">Search websites<input type="search" data-website-search placeholder="Name, slug, or domain" /></label><label>Status<select data-website-filter><option value="all">All websites</option><option value="drafts">Drafts</option><option value="published">Published</option><option value="archived">Archived</option></select></label><label>Sort<select data-website-sort><option value="recent">Recently edited</option><option value="name">Name</option><option value="status">Status</option></select></label><span data-website-count>${sites.length} website${sites.length === 1 ? '' : 's'}</span></div><div class="website-grid" data-website-grid></div>`;
     bindCommon();
+    const renderWebsiteGrid = () => {
+      const query = document.querySelector<HTMLInputElement>('[data-website-search]')?.value ?? '';
+      const filter = (document.querySelector<HTMLSelectElement>('[data-website-filter]')?.value ??
+        'all') as WebsiteFilter;
+      const sort = (document.querySelector<HTMLSelectElement>('[data-website-sort]')?.value ??
+        'recent') as WebsiteSort;
+      const filtered = filterAndSortWebsites(sites, query, filter, sort);
+      const grid = document.querySelector<HTMLElement>('[data-website-grid]');
+      const count = document.querySelector<HTMLElement>('[data-website-count]');
+      if (grid)
+        grid.innerHTML =
+          filtered.map(siteCard).join('') ||
+          empty('No matching websites', 'Try a different search or filter.');
+      if (count)
+        count.textContent = `${filtered.length} website${filtered.length === 1 ? '' : 's'}`;
+      bindCommon();
+    };
+    renderWebsiteGrid();
+    document.querySelector('[data-website-search]')?.addEventListener('input', renderWebsiteGrid);
+    document.querySelector('[data-website-filter]')?.addEventListener('change', renderWebsiteGrid);
+    document.querySelector('[data-website-sort]')?.addEventListener('change', renderWebsiteGrid);
     document
       .querySelector<HTMLSelectElement>('[data-workspace-select]')
       ?.addEventListener('change', (event) => {

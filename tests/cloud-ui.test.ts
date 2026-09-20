@@ -3,6 +3,7 @@ import { parseRoute } from '../src/cloud/app-router';
 import { protectedRedirect } from '../src/cloud/protected-route';
 import { CloudAutosaveQueue } from '../src/cloud/autosave-queue';
 import { createEmptyProject } from '../src/models/project-schema';
+import { filterAndSortWebsites } from '../src/cloud/dashboard-view';
 import type { ProjectRepository, SiteProject } from '../src/cloud/contracts';
 
 const project = createEmptyProject();
@@ -48,6 +49,67 @@ describe('cloud application routing', () => {
       siteId: 'site-1',
     });
     expect(parseRoute('/account')).toEqual({ kind: 'dashboard', section: 'account' });
+  });
+});
+
+describe('website dashboard filtering', () => {
+  const sites = [
+    {
+      id: '1',
+      workspaceId: 'w',
+      name: 'Zebra',
+      slug: 'zebra',
+      status: 'active',
+      homepagePageId: null,
+      currentRevision: 1,
+      pageCount: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      updatedBy: 'u',
+      published: false,
+    },
+    {
+      id: '2',
+      workspaceId: 'w',
+      name: 'Alpha',
+      slug: 'alpha',
+      status: 'active',
+      homepagePageId: null,
+      currentRevision: 2,
+      pageCount: 2,
+      updatedAt: '2026-01-03T00:00:00Z',
+      updatedBy: 'u',
+      published: true,
+    },
+    {
+      id: '3',
+      workspaceId: 'w',
+      name: 'Old',
+      slug: 'old',
+      status: 'archived',
+      homepagePageId: null,
+      currentRevision: 1,
+      pageCount: 1,
+      updatedAt: '2026-01-02T00:00:00Z',
+      updatedBy: 'u',
+      published: false,
+    },
+  ] as const;
+
+  it('filters by query and lifecycle state, then sorts predictably', () => {
+    expect(filterAndSortWebsites([...sites], 'alp', 'all', 'name').map((site) => site.id)).toEqual([
+      '2',
+    ]);
+    expect(
+      filterAndSortWebsites([...sites], '', 'drafts', 'recent').map((site) => site.id),
+    ).toEqual(['1']);
+    expect(
+      filterAndSortWebsites([...sites], '', 'archived', 'recent').map((site) => site.id),
+    ).toEqual(['3']);
+    expect(filterAndSortWebsites([...sites], '', 'all', 'recent').map((site) => site.id)).toEqual([
+      '2',
+      '3',
+      '1',
+    ]);
   });
 });
 
