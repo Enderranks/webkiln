@@ -11,14 +11,13 @@ export function parseRoute(pathname = window.location.pathname): AppRoute {
   if (path === '/signup') return { kind: 'signup' };
   if (path === '/dashboard') return { kind: 'dashboard' };
   const editorMatch = path.match(/^\/editor\/([^/]+)$/);
-  if (editorMatch)
-    return {
-      kind: 'editor',
-      siteId: decodeURIComponent(editorMatch[1]),
-      preview:
-        typeof window !== 'undefined' &&
-        new URLSearchParams(window.location.search).get('preview') === '1',
-    };
+  if (editorMatch) {
+    const siteId = decodeURIComponent(editorMatch[1]);
+    const preview =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('preview') === '1';
+    return preview ? { kind: 'editor', siteId, preview: true } : { kind: 'editor', siteId };
+  }
   return { kind: 'local' };
 }
 
