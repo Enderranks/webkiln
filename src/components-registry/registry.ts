@@ -92,6 +92,66 @@ const definitions: Array<[string, string, ComponentDefinition['category'], strin
     'content',
     '<footer class="inserted section-block"><h3>UNDERLINE</h3><p>Links and legal details.</p></footer>',
   ],
+  [
+    'tabs',
+    'Tabs',
+    'content',
+    '<section class="wk-tabs" data-wk-component="tabs"><div role="tablist"><button role="tab" aria-selected="true" aria-controls="tab-panel-1">First tab</button><button role="tab" aria-selected="false" aria-controls="tab-panel-2">Second tab</button></div><div id="tab-panel-1" role="tabpanel">Tab content</div><div id="tab-panel-2" role="tabpanel" hidden>More content</div></section>',
+  ],
+  [
+    'accordion',
+    'Accordion',
+    'content',
+    '<section class="wk-accordion" data-wk-component="accordion"><details><summary>Frequently asked question</summary><p>Answer with useful context.</p></details></section>',
+  ],
+  [
+    'modal',
+    'Modal',
+    'content',
+    '<dialog class="wk-modal" aria-labelledby="modal-title"><button type="button" aria-label="Close dialog">×</button><h2 id="modal-title">A focused message</h2><p>Keep important content in a keyboard-accessible dialog.</p></dialog>',
+  ],
+  [
+    'drawer',
+    'Drawer',
+    'content',
+    '<aside class="wk-drawer" aria-hidden="true" hidden><button type="button" aria-label="Close drawer">×</button><h2>More details</h2></aside>',
+  ],
+  [
+    'tooltip',
+    'Tooltip',
+    'content',
+    '<span class="wk-tooltip" tabindex="0" aria-describedby="tooltip-copy">Hover or focus me<span id="tooltip-copy" role="tooltip">Helpful context</span></span>',
+  ],
+  [
+    'carousel',
+    'Carousel',
+    'media',
+    '<section class="wk-carousel" aria-roledescription="carousel"><button type="button" aria-label="Previous slide">‹</button><div aria-live="polite">Slide one</div><button type="button" aria-label="Next slide">›</button></section>',
+  ],
+  [
+    'before-after',
+    'Before-and-after slider',
+    'media',
+    '<div class="wk-before-after"><div>Before</div><div>After</div><label><span class="sr-only">Compare images</span><input type="range" min="0" max="100" value="50" /></label></div>',
+  ],
+  [
+    'counter',
+    'Animated counter',
+    'content',
+    '<span class="wk-counter" data-wk-value="100" aria-live="polite">0</span>',
+  ],
+  [
+    'sticky-navigation',
+    'Sticky navigation',
+    'content',
+    '<nav class="wk-sticky-navigation" aria-label="Sticky navigation"><a href="#top">Back to top</a></nav>',
+  ],
+  [
+    'announcement-banner',
+    'Announcement banner',
+    'content',
+    '<aside class="wk-announcement" role="status"><strong>Announcement</strong><span>Share a timely update.</span><button type="button" aria-label="Dismiss announcement">×</button></aside>',
+  ],
 ];
 
 export const componentRegistry: ComponentDefinition[] = definitions.map(

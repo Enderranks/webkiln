@@ -13,6 +13,8 @@ import { protectedRedirect } from './cloud/protected-route';
 import { EditingExperienceController } from './editor/editing-experience';
 import { DesignGuardianController } from './editor/design-guardian';
 import { DynamicBindingController } from './editor/dynamic-binding';
+import { InteractionEditorController } from './editor/interaction-editor';
+import { installInteractionRuntime } from './editor/interaction-runtime';
 
 const cloud = new WebKilnApiClient();
 const storage = new LocalProjectStorage();
@@ -85,11 +87,17 @@ async function bootEditor(siteId?: string, remote?: SiteProject, preview = false
     new DesignGuardianController(adapter, project, () =>
       editorController.markDirty('Design system'),
     ).start();
+    new InteractionEditorController(adapter, project, () =>
+      editorController.markDirty('Interaction settings'),
+    ).start();
     if (siteId && remote)
       void new DynamicBindingController(adapter, cloud, remote.site.workspaceId, () =>
         editorController.markDirty('Dynamic binding'),
       ).start();
     if (preview) adapter.setPreview(true);
+    const frameDocument = adapter.getFrameDocument();
+    if (frameDocument && project.editorSettings?.interactions?.length)
+      installInteractionRuntime(frameDocument, project.editorSettings.interactions);
     renderAccountMenu(cloud);
     renderCloudStatus(cloud, siteId);
     if (siteId && remote) {

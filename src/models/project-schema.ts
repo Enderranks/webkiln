@@ -1,7 +1,7 @@
 import type { EditorSettings, WebKilnProject } from '../types';
 import { defaultDesignSystem } from '../editor/design-system';
 
-export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const CURRENT_SCHEMA_VERSION = 3 as const;
 export const DEFAULT_BREAKPOINTS = [
   { id: 'desktop', label: 'Desktop', width: 1200 },
   { id: 'laptop', label: 'Laptop', width: 1024, inheritedFrom: 'desktop' },
@@ -14,6 +14,7 @@ export function createDefaultEditorSettings(): EditorSettings {
     breakpoints: [...DEFAULT_BREAKPOINTS],
     responsiveIntents: {},
     designSystem: defaultDesignSystem(),
+    interactions: [],
   };
 }
 
@@ -67,7 +68,9 @@ export function isWebKilnProject(value: unknown): value is WebKilnProject {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<WebKilnProject>;
   return (
-    (candidate.schemaVersion === CURRENT_SCHEMA_VERSION || candidate.schemaVersion === 1) &&
+    (candidate.schemaVersion === CURRENT_SCHEMA_VERSION ||
+      candidate.schemaVersion === 2 ||
+      candidate.schemaVersion === 1) &&
     Array.isArray(candidate.pages) &&
     typeof candidate.site === 'object'
   );
@@ -90,6 +93,7 @@ export function migrateProject(value: unknown): WebKilnProject {
           ? candidate.editorSettings.breakpoints
           : [...DEFAULT_BREAKPOINTS],
         responsiveIntents: candidate.editorSettings?.responsiveIntents ?? {},
+        interactions: candidate.editorSettings?.interactions ?? [],
         designSystem: {
           ...defaultDesignSystem(),
           ...(candidate.editorSettings?.designSystem ?? {}),

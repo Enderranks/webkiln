@@ -4,7 +4,7 @@ import { createEmptyProject, isWebKilnProject, migrateProject } from '../src/mod
 describe('WebKiln project schema', () => {
   it('creates a valid versioned project', () => {
     const project = createEmptyProject();
-    expect(project.schemaVersion).toBe(2);
+    expect(project.schemaVersion).toBe(3);
     expect(isWebKilnProject(project)).toBe(true);
     expect(project.pages).toEqual([]);
   });

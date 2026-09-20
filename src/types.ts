@@ -31,11 +31,61 @@ export interface ResponsiveComponentMetadata {
   intents: ResponsiveIntent[];
   overrides?: Record<string, boolean>;
 }
+export type InteractionTrigger =
+  | 'page-load'
+  | 'enter-viewport'
+  | 'leave-viewport'
+  | 'click'
+  | 'hover'
+  | 'focus'
+  | 'form-success'
+  | 'scroll-position'
+  | 'breakpoint-change';
+export type InteractionActionType =
+  | 'show'
+  | 'hide'
+  | 'toggle-class'
+  | 'open-modal'
+  | 'open-drawer'
+  | 'switch-tab'
+  | 'expand-accordion'
+  | 'scroll-to'
+  | 'opacity'
+  | 'translate'
+  | 'scale'
+  | 'rotate'
+  | 'color'
+  | 'counter'
+  | 'media-play'
+  | 'media-pause';
+export interface InteractionAction {
+  id: string;
+  type: InteractionActionType;
+  target?: string;
+  value?: string | number;
+  duration: number;
+  delay: number;
+  easing: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
+  breakpoint?: DeviceId;
+  reducedMotion?: 'skip' | 'instant' | 'preserve';
+}
+export interface InteractionDefinition {
+  id: string;
+  name: string;
+  trigger: InteractionTrigger;
+  target: string;
+  scrollPosition?: number;
+  actions: InteractionAction[];
+  sequence: 'sequence' | 'parallel';
+  loop: { enabled: boolean; count?: number; delay: number };
+  enabled: boolean;
+}
 export interface EditorSettings {
   mode: EditingMode;
   breakpoints: ResponsiveBreakpoint[];
   responsiveIntents: Record<string, ResponsiveComponentMetadata>;
   designSystem?: DesignSystem;
+  interactions?: InteractionDefinition[];
 }
 
 export interface DesignToken {
@@ -72,7 +122,7 @@ export interface PageDocument {
 }
 
 export interface WebKilnProject {
-  schemaVersion: 2;
+  schemaVersion: 1 | 2 | 3;
   site: SiteMetadata;
   pages: PageDocument[];
   deletedPages: PageDocument[];
