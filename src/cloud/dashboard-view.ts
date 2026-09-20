@@ -15,6 +15,7 @@ const esc = (value: string) =>
   );
 const sections = [
   'overview',
+  'analytics',
   'websites',
   'collections',
   'automations',
@@ -63,6 +64,7 @@ export async function renderDashboard(
       .querySelectorAll<HTMLButtonElement>('[data-nav]')
       .forEach((button) => button.classList.toggle('active', button.dataset.nav === section));
     if (section === 'overview') renderOverview();
+    else if (section === 'analytics') renderAnalytics();
     else if (section === 'websites') renderWebsites();
     else if (section === 'collections') void renderCollections();
     else if (section === 'automations') void renderAutomations();
@@ -75,6 +77,11 @@ export async function renderDashboard(
   const renderOverview = () => {
     view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Overview</p><h1>Good to see you, ${esc(session.user.displayName.split(' ')[0])}.</h1><p>Everything you need to keep your web presence moving.</p></div><button class="primary-btn" data-create-site>New website</button></div><div class="dashboard-stats"><div><small>Websites</small><strong>${sites.length}</strong><span>In this workspace</span></div><div><small>Published</small><strong>${sites.filter((site) => site.published).length}</strong><span>Live experiences</span></div><div><small>Drafts</small><strong>${sites.filter((site) => !site.published).length}</strong><span>Ready to refine</span></div></div><section class="dashboard-panel overview-panel"><div class="panel-title"><div><p class="eyebrow">Recent websites</p><h2>Pick up where you left off</h2></div><button class="text-button" data-nav="websites">View all</button></div>${sites.slice(0, 3).map(siteCard).join('') || empty('No websites yet', 'Create a blank website or start from a template.')}</section><section class="dashboard-panel welcome-panel"><p class="eyebrow">A considered start</p><h2>Build with clarity.</h2><p>WebKiln keeps the details close and the interface calm, so your team can focus on the work visitors actually see.</p></section></div>`;
     bindCommon();
+  };
+  const renderAnalytics = () => {
+    const totalPages = sites.reduce((sum, site) => sum + site.pageCount, 0);
+    const revisions = sites.reduce((sum, site) => sum + site.currentRevision, 0);
+    view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Analytics</p><h1>Understand what is ready.</h1><p>Calculated workspace signals are available now. Visitor analytics require a configured analytics provider and are not invented here.</p></div></div><div class="dashboard-stats"><div><small>Websites</small><strong>${sites.length}</strong><span>Calculated from workspace data</span></div><div><small>Published</small><strong>${sites.filter((site) => site.published).length}</strong><span>Calculated from deployment state</span></div><div><small>Pages</small><strong>${totalPages}</strong><span>Calculated from site metadata</span></div><div><small>Revisions</small><strong>${revisions}</strong><span>Calculated from saved revisions</span></div></div><section class="dashboard-panel analytics-panel"><div class="panel-title"><div><p class="eyebrow">Production measurements</p><h2>Analytics provider not connected</h2></div><span class="status-chip">Unavailable</span></div><p>WebKiln does not currently collect page views, visitors, conversion events, referrers, or performance telemetry. No external analytics script or paid observability service is enabled.</p><div class="analytics-unavailable-grid"><div><strong>Visitors</strong><small>Unavailable until an approved provider is configured.</small></div><div><strong>Conversions</strong><small>Unavailable until event tracking is explicitly enabled.</small></div><div><strong>Performance</strong><small>Use Site Health for calculated checks; production measurements remain unavailable.</small></div></div></section></div>`;
   };
   const renderWebsites = () => {
     view.innerHTML = `<div class="customer-heading"><div><p class="eyebrow">Workspace / Websites</p><h1>Your websites</h1><p>Draft, publish, and manage every WebKiln experience from one place.</p></div><button class="primary-btn" data-create-site>New website</button></div><div class="website-toolbar"><label>Workspace<select data-workspace-select>${workspaces.map((workspace) => `<option value="${esc(workspace.id)}" ${workspace.id === selectedWorkspaceId ? 'selected' : ''}>${esc(workspace.name)}</option>`).join('')}</select></label><span>${sites.length} website${sites.length === 1 ? '' : 's'}</span></div><div class="website-grid">${sites.map(siteCard).join('') || empty('Your first website starts here', 'Choose a blank canvas or a template to get moving.')}</div>`;
@@ -557,6 +564,7 @@ export async function renderDashboard(
   const navIcon = (section: string) =>
     ({
       overview: '◌',
+      analytics: '⌁',
       websites: '◈',
       collections: '{}',
       automations: '↯',

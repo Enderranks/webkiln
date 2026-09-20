@@ -24,7 +24,7 @@ export function parseRoute(pathname = window.location.pathname): AppRoute {
       cms: 'collections',
       forms: 'forms',
       automations: 'automations',
-      analytics: 'overview',
+      analytics: 'analytics',
       publishing: 'websites',
       settings: 'account',
     };

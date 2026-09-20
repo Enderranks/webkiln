@@ -42,6 +42,11 @@ describe('cloud application routing', () => {
       section: 'collections',
       siteId: 'site-1',
     });
+    expect(parseRoute('/site/site-1/analytics')).toEqual({
+      kind: 'dashboard',
+      section: 'analytics',
+      siteId: 'site-1',
+    });
     expect(parseRoute('/account')).toEqual({ kind: 'dashboard', section: 'account' });
   });
 });
