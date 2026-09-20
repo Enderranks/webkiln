@@ -8,6 +8,7 @@ import { CloudEditorSync } from './cloud/cloud-editor-sync';
 import { parseRoute, navigate } from './cloud/app-router';
 import { renderAuthView } from './cloud/auth-view';
 import { renderDashboard } from './cloud/dashboard-view';
+import { renderOnboarding } from './cloud/onboarding-view';
 import type { Session, SiteProject, SiteRevision } from './cloud/contracts';
 import { protectedRedirect } from './cloud/protected-route';
 import { EditingExperienceController } from './editor/editing-experience';
@@ -25,12 +26,12 @@ async function boot(): Promise<void> {
     await renderAuthView(cloud, route.kind);
     return;
   }
-  if (route.kind === 'dashboard' || route.kind === 'editor') {
+  if (route.kind === 'dashboard' || route.kind === 'onboarding' || route.kind === 'editor') {
     if (!cloud.configured) {
       navigate('/');
       return;
     }
-    if (route.kind === 'dashboard') {
+    if (route.kind === 'dashboard' || route.kind === 'onboarding') {
       document.body.innerHTML =
         '<main class="cloud-app auth-app"><div class="auth-loading" role="status">Restoring your session…</div></main>';
     } else {
@@ -46,6 +47,10 @@ async function boot(): Promise<void> {
       document.documentElement.dataset.sessionState = 'authenticated';
       if (route.kind === 'dashboard') {
         await renderDashboard(cloud, storage, session);
+        return;
+      }
+      if (route.kind === 'onboarding') {
+        await renderOnboarding(cloud, session);
         return;
       }
       await bootCloudEditor(route.siteId, session, route.preview);

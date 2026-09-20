@@ -56,16 +56,6 @@ export async function renderDashboard(
       view.innerHTML = errorState(error, 'websites');
     }
   };
-  const create = async (name: string) => {
-    if (!selectedWorkspaceId) return;
-    try {
-      await cloud.createSite(selectedWorkspaceId, name);
-      say('Website created.');
-      await loadSites();
-    } catch (error) {
-      say(error instanceof Error ? error.message : 'Could not create website.');
-    }
-  };
   const renderSection = (section: Section) => {
     document
       .querySelectorAll<HTMLButtonElement>('[data-nav]')
@@ -104,9 +94,10 @@ export async function renderDashboard(
     document
       .querySelectorAll<HTMLButtonElement>('[data-template]')
       .forEach((button) =>
-        button.addEventListener(
-          'click',
-          () => void create(button.dataset.template ?? 'Template website'),
+        button.addEventListener('click', () =>
+          navigate(
+            `/onboarding?template=${encodeURIComponent(button.dataset.template ?? 'blank')}`,
+          ),
         ),
       );
   };
@@ -471,10 +462,9 @@ export async function renderDashboard(
           () => void handleSiteAction(button.dataset.action ?? '', button.dataset.site ?? ''),
         ),
       );
-    document.querySelector('[data-create-site]')?.addEventListener('click', () => {
-      const name = window.prompt('Name your new website');
-      if (name?.trim()) void create(name.trim());
-    });
+    document
+      .querySelector('[data-create-site]')
+      ?.addEventListener('click', () => navigate('/onboarding'));
     document
       .querySelectorAll<HTMLElement>('[data-nav]')
       .forEach((button) =>

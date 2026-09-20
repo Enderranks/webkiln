@@ -3,6 +3,7 @@ export type AppRoute =
   | { kind: 'login' }
   | { kind: 'signup' }
   | { kind: 'dashboard' }
+  | { kind: 'onboarding' }
   | { kind: 'editor'; siteId: string; preview?: boolean };
 
 export function parseRoute(pathname = window.location.pathname): AppRoute {
@@ -10,6 +11,7 @@ export function parseRoute(pathname = window.location.pathname): AppRoute {
   if (path === '/login') return { kind: 'login' };
   if (path === '/signup') return { kind: 'signup' };
   if (path === '/dashboard') return { kind: 'dashboard' };
+  if (path === '/onboarding') return { kind: 'onboarding' };
   const editorMatch = path.match(/^\/editor\/([^/]+)$/);
   if (editorMatch) {
     const siteId = decodeURIComponent(editorMatch[1]);
