@@ -29,6 +29,8 @@ export function normalizeEditorSettings(value?: Partial<EditorSettings>): Editor
     breakpoints: value?.breakpoints?.length ? value.breakpoints : [...DEFAULT_BREAKPOINTS],
     responsiveIntents: value?.responsiveIntents ?? {},
     designSystem: normalizeDesignSystem(value?.designSystem),
+    interactions: value?.interactions ?? [],
+    ...(value?.menus ? { menus: value.menus } : {}),
   };
 }
 

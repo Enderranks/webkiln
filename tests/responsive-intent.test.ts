@@ -42,6 +42,26 @@ describe('responsive intent engine', () => {
     expect(css).not.toContain('onclick');
   });
 
+  it('does not discard interaction or navigation metadata during normalization', () => {
+    const settings = createEmptyProject().editorSettings!;
+    settings.interactions = [
+      {
+        id: 'interaction-1',
+        name: 'Reveal',
+        trigger: 'page-load',
+        target: '#hero',
+        actions: [],
+        sequence: 'sequence',
+        loop: { enabled: false, delay: 0 },
+        enabled: true,
+      },
+    ];
+    settings.menus = [{ id: 'main', name: 'Main', items: [], mobileMode: 'drawer' }];
+    const normalized = normalizeEditorSettings(settings);
+    expect(normalized.interactions).toHaveLength(1);
+    expect(normalized.menus?.[0].id).toBe('main');
+  });
+
   it('reports intentional overflow and touch-target risks', () => {
     const warnings = validateResponsive(
       {
