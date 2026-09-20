@@ -53,7 +53,8 @@ test.describe('WebKiln platform quality', () => {
 
   test('command palette opens and filters editor commands', async ({ page }) => {
     await page.goto('/');
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+KeyK' : 'Control+KeyK');
+    await page.waitForFunction(() => document.documentElement.dataset.editorEngine === 'webkiln');
+    await page.locator('#commandBtn').click();
     await expect(page.locator('#commandPalette')).toBeVisible();
     await page.locator('#commandSearch').fill('publish');
     await expect(page.locator('[data-command="publish"]')).toBeVisible();
