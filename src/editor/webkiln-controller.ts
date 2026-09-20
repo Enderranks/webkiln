@@ -538,10 +538,22 @@ export class WebKilnEditorController {
         const title = window.prompt('SEO title', page.seo?.title ?? page.name);
         if (title === null) return;
         const description = window.prompt('SEO description', page.seo?.description ?? '') ?? '';
+        const canonical =
+          window.prompt('Canonical URL (optional)', page.seo?.canonical ?? '') ?? '';
+        const robotsInput =
+          window.prompt(
+            'Robots directive: index,follow or noindex,nofollow',
+            page.seo?.robots ?? 'index,follow',
+          ) ?? 'index,follow';
+        const robots = /noindex\s*,\s*nofollow/i.test(robotsInput)
+          ? 'noindex,nofollow'
+          : 'index,follow';
         page.seo = {
           ...(page.seo ?? { title: page.name, description: '' }),
           title: title.trim() || page.name,
           description: description.trim(),
+          canonical: canonical.trim() || undefined,
+          robots,
         };
         page.updatedAt = new Date().toISOString();
         this.saveNow('Page SEO updated');
