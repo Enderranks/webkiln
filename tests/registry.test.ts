@@ -46,9 +46,27 @@ describe('component registry', () => {
   it('provides migration and placement metadata for every definition', () => {
     expect(
       componentRegistry.every(
-        (item) => item.defaultContent && item.migrate && item.allowedParents.length,
+        (item) =>
+          item.defaultContent &&
+          item.migrate &&
+          item.allowedParents.length &&
+          item.allowedChildren.length &&
+          item.icon &&
+          item.preview &&
+          item.inspectorSchema.length &&
+          item.responsiveCapabilities.length &&
+          item.defaultDesignTokens,
       ),
     ).toBe(true);
+  });
+
+  it('describes accessibility requirements for interactive families', () => {
+    expect(getComponentDefinition('image')?.accessibilityRequirements).toEqual(
+      expect.arrayContaining([expect.stringContaining('alternative text')]),
+    );
+    expect(getComponentDefinition('form')?.accessibilityRequirements).toEqual(
+      expect.arrayContaining([expect.stringContaining('label')]),
+    );
   });
 
   it('describes smart section purpose, content requirements, and variants', () => {

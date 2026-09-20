@@ -3,11 +3,22 @@ export interface ComponentDefinition {
   version: number;
   category: 'layout' | 'content' | 'commerce' | 'forms' | 'media';
   displayName: string;
+  icon: string;
+  preview: string;
   defaultContent: string;
   defaultStyles: Record<string, string>;
   editableTraits: string[];
+  inspectorSchema: Array<{
+    key: string;
+    label: string;
+    type: 'text' | 'number' | 'color' | 'select';
+  }>;
   allowedParents: string[];
+  allowedChildren: string[];
   responsive: boolean;
+  responsiveCapabilities: string[];
+  accessibilityRequirements: string[];
+  defaultDesignTokens: Record<string, string>;
   guidedControls?: string[];
   explanation?: string;
   smartSection?: {
@@ -377,11 +388,32 @@ export const componentRegistry: ComponentDefinition[] = definitions.map(
     displayName,
     category,
     version: 1,
+    icon:
+      category === 'layout' ? '□' : category === 'media' ? '▧' : category === 'forms' ? '⌁' : '✦',
+    preview: defaultContent,
     defaultContent,
     defaultStyles: {},
     editableTraits: ['content', 'style', 'id', 'classes'],
+    inspectorSchema: [
+      { key: 'content', label: 'Content', type: 'text' },
+      { key: 'class', label: 'CSS classes', type: 'text' },
+    ],
     allowedParents: ['wrapper', 'body', 'section', 'container', 'columns'],
+    allowedChildren: ['text', 'heading', 'paragraph', 'button', 'image', 'container'],
     responsive: true,
+    responsiveCapabilities: ['visibility', 'stacking', 'width', 'spacing', 'typography'],
+    accessibilityRequirements: [
+      ...(category === 'media'
+        ? ['Provide meaningful alternative text for informative media.']
+        : []),
+      ...(category === 'forms'
+        ? ['Associate every control with a visible or programmatic label.']
+        : []),
+      ...(id === 'button'
+        ? ['Use an action-oriented accessible name and a discernible focus state.']
+        : []),
+    ],
+    defaultDesignTokens: { color: 'text-primary', spacing: 'space-md', radius: 'radius-sm' },
     guidedControls: ['content', 'responsive'],
     explanation: 'This component is safe to edit visually and adapts across breakpoints.',
     ...(SMART_SECTION_METADATA[id] ? { smartSection: SMART_SECTION_METADATA[id] } : {}),
