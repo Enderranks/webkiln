@@ -4,6 +4,7 @@ import { navigate } from './app-router';
 import type { LocalProjectStorage } from '../storage/project-storage';
 import { createMigrationBackup, previewLocalProject } from './local-import';
 import { findDuplicateAssetIds } from '../assets/asset-storage';
+import { createProjectBackup, createStaticExport } from '../portability/export';
 
 const esc = (value: string) =>
   value.replace(
@@ -459,7 +460,7 @@ export async function renderDashboard(
   };
   const siteCard = (site: CloudSite) => {
     const publicUrl = `${window.location.origin}/sites/${encodeURIComponent(site.slug)}`;
-    return `<article class="website-card"><div class="website-thumbnail"><span>W</span><small>${site.published ? 'LIVE' : 'DRAFT'}</small></div><div class="website-card-body"><div class="website-card-head"><div><h2>${esc(site.name)}</h2><p class="website-url">${site.customDomain ? esc(site.customDomain) : publicUrl}</p></div><details class="site-actions"><summary aria-label="Actions for ${esc(site.name)}">•••</summary><div class="site-actions-menu"><button type="button" data-action="rename" data-site="${site.id}">Rename</button><button type="button" data-action="duplicate" data-site="${site.id}">Duplicate</button><button type="button" data-action="domain" data-site="${site.id}">Connect domain</button><button type="button" data-action="archive" data-site="${site.id}">${site.status === 'archived' ? 'Restore website' : 'Archive website'}</button>${site.status === 'archived' ? `<button type="button" data-action="delete" data-site="${site.id}" class="danger-action">Delete permanently</button>` : ''}</div></details></div><div class="website-meta"><span class="status-chip ${site.published ? 'published' : ''}">${site.published ? 'Published' : 'Draft'}</span><span>Edited ${new Date(site.updatedAt).toLocaleDateString()}</span><span>Revision ${site.currentRevision}</span><span class="deployment-status">${site.published ? 'Deployment live' : 'Not deployed'}</span></div><div class="website-actions"><button class="primary-btn" data-action="edit" data-site="${site.id}">Open editor</button><button class="ghost-btn" data-action="preview" data-site="${site.id}">Preview draft</button>${site.published ? `<a class="text-button" href="${publicUrl}" target="_blank" rel="noreferrer">View published</a>` : ''}</div></div></article>`;
+    return `<article class="website-card"><div class="website-thumbnail"><span>W</span><small>${site.published ? 'LIVE' : 'DRAFT'}</small></div><div class="website-card-body"><div class="website-card-head"><div><h2>${esc(site.name)}</h2><p class="website-url">${site.customDomain ? esc(site.customDomain) : publicUrl}</p></div><details class="site-actions"><summary aria-label="Actions for ${esc(site.name)}">•••</summary><div class="site-actions-menu"><button type="button" data-action="rename" data-site="${site.id}">Rename</button><button type="button" data-action="duplicate" data-site="${site.id}">Duplicate</button><button type="button" data-action="export" data-site="${site.id}">Export static site</button><button type="button" data-action="backup" data-site="${site.id}">Download backup</button><button type="button" data-action="domain" data-site="${site.id}">Connect domain</button><button type="button" data-action="archive" data-site="${site.id}">${site.status === 'archived' ? 'Restore website' : 'Archive website'}</button>${site.status === 'archived' ? `<button type="button" data-action="delete" data-site="${site.id}" class="danger-action">Delete permanently</button>` : ''}</div></details></div><div class="website-meta"><span class="status-chip ${site.published ? 'published' : ''}">${site.published ? 'Published' : 'Draft'}</span><span>Edited ${new Date(site.updatedAt).toLocaleDateString()}</span><span>Revision ${site.currentRevision}</span><span class="deployment-status">${site.published ? 'Deployment live' : 'Not deployed'}</span></div><div class="website-actions"><button class="primary-btn" data-action="edit" data-site="${site.id}">Open editor</button><button class="ghost-btn" data-action="preview" data-site="${site.id}">Preview draft</button>${site.published ? `<a class="text-button" href="${publicUrl}" target="_blank" rel="noreferrer">View published</a>` : ''}</div></div></article>`;
   };
   const bindCommon = () => {
     document
@@ -488,7 +489,28 @@ export async function renderDashboard(
         navigate(
           `/editor/${encodeURIComponent(siteId)}${action === 'preview' ? '?preview=1' : ''}`,
         );
-      else if (action === 'rename') {
+      else if (action === 'export' || action === 'backup') {
+        const remote = await cloud.getProject(siteId);
+        if (action === 'backup')
+          downloadFile(
+            `${site.slug}-webkiln-backup.json`,
+            JSON.stringify(createProjectBackup(remote.project), null, 2),
+            'application/json',
+          );
+        else
+          createStaticExport(remote.project).forEach((file) =>
+            downloadFile(
+              file.path.replace(/\//g, '-'),
+              file.content,
+              file.contentType === 'css'
+                ? 'text/css'
+                : file.contentType === 'html'
+                  ? 'text/html'
+                  : 'application/octet-stream',
+            ),
+          );
+        say(action === 'backup' ? 'Backup downloaded.' : 'Static export downloaded.');
+      } else if (action === 'rename') {
         const name = window.prompt('New website name', site.name);
         if (name?.trim()) {
           await cloud.updateSite(siteId, { name: name.trim() });
@@ -527,6 +549,13 @@ export async function renderDashboard(
     } catch (error) {
       say(error instanceof Error ? error.message : 'Website action failed.');
     }
+  };
+  const downloadFile = (name: string, content: string, type: string) => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([content], { type }));
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
   const empty = (title: string, copy: string) =>
     `<div class="empty-state dashboard-empty"><strong>${title}</strong><small>${copy}</small></div>`;
