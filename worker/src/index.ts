@@ -2410,7 +2410,12 @@ async function renderPublicPage(
     c,
     html,
     foundPage ? 200 : 404,
-    Boolean(foundPage && hasAccess && published.snapshot.interactions?.length),
+    Boolean(
+      foundPage &&
+      hasAccess &&
+      (published.snapshot.interactions?.length ||
+        resolvedPage.html.includes('data-webkiln-form-id')),
+    ),
   );
 }
 
