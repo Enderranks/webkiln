@@ -3,29 +3,24 @@
   "name": "webkiln-v10-api-dev",
   "main": "worker/src/index.ts",
   "compatibility_date": "2026-09-19",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/api/*",
-      "/sites/*"
-    ]
+    "run_worker_first": ["/api/*", "/sites/*", "/webkiln-runtime.js"],
   },
   "vars": {
     "APP_ORIGIN": "https://webkiln-v10-api-dev.underline-dev.workers.dev",
     "AUTH_URL": "https://webkiln-v10-api-dev.underline-dev.workers.dev",
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "webkiln-v10-dev",
       "database_id": "1868187f-3e50-40e4-9ab7-bb434c6c9605",
-      "migrations_dir": "worker/migrations"
-    }
-  ]
+      "migrations_dir": "worker/migrations",
+    },
+  ],
 }
