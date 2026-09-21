@@ -317,7 +317,7 @@ export function publicHtml(
   const hasInteractions = Boolean(snapshot.interactions?.length);
   const runtime =
     hasInteractions || hasForms
-      ? `${hasInteractions ? `<script type="application/json" id="webkiln-interactions">${JSON.stringify(snapshot.interactions).replace(/</g, '\\u003c')}</script>` : ''}<script src="/webkiln-runtime.js" defer></script>`
+      ? `${hasInteractions ? `<script type="application/json" id="webkiln-interactions">${JSON.stringify(snapshot.interactions).replace(/</g, '\\u003c')}</script>` : ''}<script src="/api/webkiln-runtime.js" defer></script>`
       : '';
   return pageShell(
     page.seo.title || snapshot.site.title,

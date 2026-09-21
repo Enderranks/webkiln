@@ -230,7 +230,7 @@ describe('published site snapshots', () => {
     expect(snapshot.interactions).toHaveLength(1);
     expect(snapshot.interactions?.[0].actions).toHaveLength(1);
     expect(html).toContain('webkiln-interactions');
-    expect(html).toContain('/webkiln-runtime.js');
+    expect(html).toContain('/api/webkiln-runtime.js');
     expect(html).toContain('data-webkiln-id="hero-cta"');
     expect(html).not.toContain('data-wk-id');
   });

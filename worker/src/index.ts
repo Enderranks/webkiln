@@ -483,7 +483,7 @@ app.all('/api/auth/*', async (c) => {
 app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT, database: 'd1' }));
 
 app.get(
-  '/webkiln-runtime.js',
+  '/api/webkiln-runtime.js',
   () =>
     new Response(publicInteractionRuntime(), {
       headers: {
