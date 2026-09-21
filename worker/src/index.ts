@@ -2154,8 +2154,17 @@ app.post('/api/sites/:siteId/publish', async (c) => {
     return jsonError(c, 400, 'VALIDATION_ERROR', 'A password is required for protected pages');
   if (JSON.stringify(project).length > 8 * 1024 * 1024)
     return jsonError(c, 413, 'VALIDATION_ERROR', 'Project payload is too large to publish');
+  const activeForms = await db
+    .select({ id: formDefinition.id })
+    .from(formDefinition)
+    .where(and(eq(formDefinition.siteId, record.site.id), eq(formDefinition.status, 'active')))
+    .all();
   const now = new Date();
-  const snapshot = createPublishedSnapshot(project, now.toISOString());
+  const snapshot = createPublishedSnapshot(
+    project,
+    now.toISOString(),
+    new Set(activeForms.map((form) => form.id)),
+  );
   const previous = await db
     .select({ releaseNumber: publishedRelease.releaseNumber })
     .from(publishedRelease)

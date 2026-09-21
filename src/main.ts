@@ -84,7 +84,13 @@ async function bootEditor(siteId?: string, remote?: SiteProject, preview = false
     ensurePages(project, adapter.exportProjectData());
     const currentPage = project.pages.find((page) => page.id === project.currentPageId);
     if (currentPage?.projectData) adapter.loadProjectData(currentPage.projectData);
-    const editorController = new WebKilnEditorController(adapter, project, storage);
+    const formDefinitions = siteId && remote ? await cloud.listForms(siteId).catch(() => []) : [];
+    const editorController = new WebKilnEditorController(
+      adapter,
+      project,
+      storage,
+      formDefinitions,
+    );
     editorController.start();
     new EditingExperienceController(adapter, project, () =>
       editorController.markDirty('Responsive settings'),

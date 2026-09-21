@@ -22,6 +22,7 @@ import {
   removeMenuItem,
 } from '../models/menu-manager';
 import { getLayoutPresetStyles, LAYOUT_CONTROLS, type LayoutPreset } from './layout-presets';
+import type { FormDefinition } from '../cloud/contracts';
 
 const blockMap: Record<string, string> = {
   hero: 'hero',
@@ -98,6 +99,7 @@ export class WebKilnEditorController {
     private readonly adapter: WebKilnEditorAdapter,
     private readonly project: WebKilnProject,
     private readonly storage: LocalProjectStorage,
+    private readonly forms: FormDefinition[] = [],
   ) {}
 
   start(): void {
@@ -794,8 +796,65 @@ export class WebKilnEditorController {
     host.replaceChildren();
     if (!this.selected) return;
     this.renderSmartSectionInspector(host);
+    this.renderFormBinding(host);
     if (tab === 'content') this.renderContentControls(host);
     if (tab === 'advanced') this.renderAdvancedControls(host);
+  }
+
+  private renderFormBinding(host: HTMLElement): void {
+    if (!this.selected || String(this.selected.get('tagName') || '').toLowerCase() !== 'form')
+      return;
+    const attributes = (this.selected.getAttributes?.() ?? {}) as Record<string, string>;
+    const card = document.createElement('section');
+    card.className = 'smart-inspector';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = 'WebKiln form';
+    const title = document.createElement('strong');
+    title.textContent = 'Connect this form to submissions';
+    const note = document.createElement('p');
+    note.className = 'panel-note';
+    note.textContent = this.forms.length
+      ? 'Only active forms from this site can receive public submissions.'
+      : 'Create a form in the Forms dashboard, then return here to connect it.';
+    const label = document.createElement('label');
+    label.className = 'field dynamic-field';
+    label.textContent = 'Submission form';
+    const select = document.createElement('select');
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'Not connected';
+    select.append(empty);
+    this.forms.forEach((form) => {
+      const option = document.createElement('option');
+      option.value = form.id;
+      option.textContent = `${form.name} · ${form.fields.length} fields`;
+      option.selected = attributes['data-wk-form-id'] === form.id;
+      select.append(option);
+    });
+    select.addEventListener('change', () => {
+      const formId = select.value;
+      if (formId) {
+        this.selected?.addAttributes({
+          'data-wk-form-id': formId,
+          method: 'post',
+          action: `/api/forms/${encodeURIComponent(formId)}/submit`,
+        });
+        this.toast(
+          'Form connected',
+          'Public submissions will use WebKiln validation and D1 storage.',
+        );
+      } else {
+        this.selected?.removeAttributes('data-wk-form-id');
+        this.selected?.removeAttributes('action');
+        this.selected?.removeAttributes('method');
+        this.toast('Form disconnected', 'This form will not accept public submissions.');
+      }
+      this.scheduleSave();
+    });
+    label.append(select);
+    card.append(eyebrow, title, note, label);
+    host.append(card);
   }
 
   private renderSmartSectionInspector(host: HTMLElement): void {

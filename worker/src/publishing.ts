@@ -42,12 +42,31 @@ export interface PublishedSnapshot {
   publishedAt: string;
 }
 
-const BLOCKED_TAGS =
-  /<\/?(script|iframe|object|embed|applet|form|base|meta|link)(?:\s|>)[\s\S]*?>/gi;
+const BLOCKED_TAGS = /<\/?(script|iframe|object|embed|applet|base|meta|link)(?:\s|>)[\s\S]*?>/gi;
 const EVENT_ATTR = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 
-export function sanitizeHtml(input: string): string {
-  return input
+function sanitizeBoundForms(input: string, allowedFormIds?: ReadonlySet<string>): string {
+  return input.replace(
+    /<form\b([^>]*)>([\s\S]*?)<\/form\s*>/gi,
+    (_match, rawAttributes, content) => {
+      const idMatch = String(rawAttributes).match(/\bdata-wk-form-id\s*=\s*["']([^"']+)["']/i);
+      const formId = idMatch?.[1]?.trim() ?? '';
+      const validId = /^[A-Za-z0-9_-]{1,120}$/.test(formId);
+      if (!validId || (allowedFormIds && !allowedFormIds.has(formId))) {
+        return '<div class="wk-form-unavailable" role="status">This form is not connected to a WebKiln form.</div>';
+      }
+      const safeAttributes =
+        String(rawAttributes)
+          .replace(/\bdata-wk-form-id\s*=\s*["'][^"']*["']/gi, '')
+          .match(/\b(?:class|id|aria-[a-z-]+)\s*=\s*(?:"[^"]*"|'[^']*')/gi)
+          ?.join(' ') ?? '';
+      return `<form data-webkiln-form-id="${escapeAttribute(formId)}" action="/api/forms/${encodeURIComponent(formId)}/submit" method="post"${safeAttributes ? ` ${safeAttributes}` : ''}>${sanitizeHtml(String(content), allowedFormIds)}</form>`;
+    },
+  );
+}
+
+export function sanitizeHtml(input: string, allowedFormIds?: ReadonlySet<string>): string {
+  return sanitizeBoundForms(input, allowedFormIds)
     .replace(
       /\s+data-wk-id\s*=\s*(?:"([^"]*)"|'([^']*)')/gi,
       (_match, doubleValue, singleValue) =>
@@ -117,7 +136,10 @@ function componentToHtml(component: unknown): string {
   return `<${tag}${attributes}>${children}</${tag}>`;
 }
 
-export function extractProjectMarkup(projectData: unknown): { html: string; css: string } {
+export function extractProjectMarkup(
+  projectData: unknown,
+  allowedFormIds?: ReadonlySet<string>,
+): { html: string; css: string } {
   const data = (projectData && typeof projectData === 'object' ? projectData : {}) as {
     components?: unknown;
     styles?: unknown;
@@ -125,17 +147,21 @@ export function extractProjectMarkup(projectData: unknown): { html: string; css:
   const styles = Array.isArray(data.styles)
     ? data.styles.map((item) => (typeof item === 'string' ? item : JSON.stringify(item))).join('\n')
     : String(data.styles ?? '');
-  return { html: sanitizeHtml(componentToHtml(data.components ?? '')), css: sanitizeCss(styles) };
+  return {
+    html: sanitizeHtml(componentToHtml(data.components ?? ''), allowedFormIds),
+    css: sanitizeCss(styles),
+  };
 }
 
 export function createPublishedSnapshot(
   project: WebKilnProject,
   publishedAt = new Date().toISOString(),
+  allowedFormIds?: ReadonlySet<string>,
 ): PublishedSnapshot {
   const pages = project.pages
     .filter((page) => !page.deletedAt)
     .map((page, index) => {
-      const markup = extractProjectMarkup(page.projectData);
+      const markup = extractProjectMarkup(page.projectData, allowedFormIds);
       return {
         id: page.id,
         name: page.name,
@@ -287,9 +313,12 @@ export function publicHtml(
       ? `<details class="wk-nav-drawer"><summary>Menu</summary><nav class="${navigationClass}">${navigation}</nav></details>`
       : `<nav class="${navigationClass}">${navigation}</nav>`;
   const html = `<header class="wk-header"><a class="wk-brand" href="${publicUrl}">${escapeText(snapshot.site.title)}</a>${navigationMarkup}</header><main>${page.html}</main>`;
-  const runtime = snapshot.interactions?.length
-    ? `<script type="application/json" id="webkiln-interactions">${JSON.stringify(snapshot.interactions).replace(/</g, '\\u003c')}</script><script src="/webkiln-runtime.js" defer></script>`
-    : '';
+  const hasForms = page.html.includes('data-webkiln-form-id');
+  const hasInteractions = Boolean(snapshot.interactions?.length);
+  const runtime =
+    hasInteractions || hasForms
+      ? `${hasInteractions ? `<script type="application/json" id="webkiln-interactions">${JSON.stringify(snapshot.interactions).replace(/</g, '\\u003c')}</script>` : ''}<script src="/webkiln-runtime.js" defer></script>`
+      : '';
   return pageShell(
     page.seo.title || snapshot.site.title,
     page.seo.description || snapshot.site.description,
@@ -337,7 +366,7 @@ function escapeAttribute(value: string): string {
   return escapeText(value);
 }
 
-const PUBLIC_INTERACTION_RUNTIME = `(()=>{const d=document,e=d.getElementById("webkiln-interactions");if(!e)return;let xs=[];try{xs=JSON.parse(e.textContent||"[]")}catch{return}const q=s=>{try{return d.querySelector(s)}catch{return null}},reduced=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;const run=x=>{const el=q(x.target);if(!el)return;for(const a of x.actions||[]){const t=reduced()?0:(a.duration||0),v=a.value;switch(a.type){case"show":el.hidden=false;break;case"hide":el.hidden=true;break;case"toggle-class":if(typeof v==="string")el.classList.toggle(v);break;case"open-modal":case"open-drawer":el.hidden=false;el.setAttribute("aria-hidden","false");el.setAttribute("data-wk-open","true");break;case"expand-accordion":if("open"in el)el.open=true;el.setAttribute("aria-expanded","true");break;case"scroll-to":el.scrollIntoView({behavior:reduced()?"auto":"smooth"});break;case"opacity":el.style.transition="all "+t+"ms ease";el.style.opacity=String(v??1);break;case"translate":el.style.transition="all "+t+"ms ease";el.style.transform="translate("+String(v||"0,0")+")";break;case"scale":el.style.transition="all "+t+"ms ease";el.style.transform="scale("+String(v??1)+")";break;case"rotate":el.style.transition="all "+t+"ms ease";el.style.transform="rotate("+String(v||"0deg")+")";break;case"color":el.style.transition="color "+t+"ms ease";el.style.color=String(v||"")}}};xs.forEach(x=>{const el=q(x.target);if(!el)return;const fire=()=>setTimeout(()=>run(x),Math.min(10000,Math.max(0,(x.actions||[])[0]?.delay||0)));if(x.trigger==="page-load")fire();if(x.trigger==="click")el.addEventListener("click",fire);if(x.trigger==="hover")el.addEventListener("pointerenter",fire);if(x.trigger==="focus")el.addEventListener("focus",fire);if(x.trigger==="scroll-position")addEventListener("scroll",()=>{if(scrollY>=(x.scrollPosition||100))fire()},{passive:true})})})();`;
+const PUBLIC_INTERACTION_RUNTIME = `(()=>{const d=document,e=d.getElementById("webkiln-interactions");let xs=[];if(e)try{xs=JSON.parse(e.textContent||"[]")}catch{}const q=s=>{try{return d.querySelector(s)}catch{return null}},reduced=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;const run=x=>{const el=q(x.target);if(!el)return;for(const a of x.actions||[]){const t=reduced()?0:(a.duration||0),v=a.value;switch(a.type){case"show":el.hidden=false;break;case"hide":el.hidden=true;break;case"toggle-class":if(typeof v==="string")el.classList.toggle(v);break;case"open-modal":case"open-drawer":el.hidden=false;el.setAttribute("aria-hidden","false");el.setAttribute("data-wk-open","true");break;case"expand-accordion":if("open"in el)el.open=true;el.setAttribute("aria-expanded","true");break;case"scroll-to":el.scrollIntoView({behavior:reduced()?"auto":"smooth"});break;case"opacity":el.style.transition="all "+t+"ms ease";el.style.opacity=String(v??1);break;case"translate":el.style.transition="all "+t+"ms ease";el.style.transform="translate("+String(v||"0,0")+")";break;case"scale":el.style.transition="all "+t+"ms ease";el.style.transform="scale("+String(v??1)+")";break;case"rotate":el.style.transition="all "+t+"ms ease";el.style.transform="rotate("+String(v||"0deg")+")";break;case"color":el.style.transition="color "+t+"ms ease";el.style.color=String(v||"")}}};xs.forEach(x=>{const el=q(x.target);if(!el)return;const fire=()=>setTimeout(()=>run(x),Math.min(10000,Math.max(0,(x.actions||[])[0]?.delay||0)));if(x.trigger==="page-load")fire();if(x.trigger==="click")el.addEventListener("click",fire);if(x.trigger==="hover")el.addEventListener("pointerenter",fire);if(x.trigger==="focus")el.addEventListener("focus",fire);if(x.trigger==="scroll-position")addEventListener("scroll",()=>{if(scrollY>=(x.scrollPosition||100))fire()},{passive:true})});d.querySelectorAll("form[data-webkiln-form-id]").forEach(f=>f.addEventListener("submit",async ev=>{ev.preventDefault();const form=f,button=form.querySelector("button[type=submit]");if(button)button.disabled=true;const payload={};new FormData(form).forEach((value,key)=>{if(key==="_website")return;payload[key]=key in payload?[].concat(payload[key],value):value});try{const response=await fetch(form.action,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify(payload),credentials:"same-origin"});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||"We could not save your submission.");form.replaceChildren(Object.assign(d.createElement("p"),{textContent:result.message||"Thanks — your message has been received."}))}catch(error){let status=form.querySelector("[data-webkiln-form-status]");if(!status){status=d.createElement("p");status.dataset.webkilnFormStatus="true";status.setAttribute("role","alert");form.append(status)}status.textContent=error instanceof Error?error.message:"We could not save your submission."}finally{if(button)button.disabled=false}}))})();`;
 
 export function publicInteractionRuntime(): string {
   return PUBLIC_INTERACTION_RUNTIME;

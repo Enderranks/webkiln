@@ -234,4 +234,37 @@ describe('published site snapshots', () => {
     expect(html).toContain('data-webkiln-id="hero-cta"');
     expect(html).not.toContain('data-wk-id');
   });
+
+  it('publishes only site-owned form bindings and adds the safe submission runtime', () => {
+    const markup = extractProjectMarkup(
+      {
+        components:
+          '<section><form data-wk-form-id="form-good"><label>Email<input name="email" type="email"></label><button type="submit">Send</button></form><form data-wk-form-id="form-other"><input name="x"></form><form><input name="ignored"></form></section>',
+      },
+      new Set(['form-good']),
+    );
+    expect(markup.html).toContain('data-webkiln-form-id="form-good"');
+    expect(markup.html).toContain('action="/api/forms/form-good/submit"');
+    expect(markup.html).not.toContain('form-other');
+    expect(markup.html).toContain('form is not connected');
+    const project = createEmptyProject();
+    project.pages = [
+      {
+        id: 'home',
+        name: 'Home',
+        slug: '/',
+        projectData: {
+          components:
+            '<form data-wk-form-id="form-good"><input name="email"><button type="submit">Send</button></form>',
+        },
+        updatedAt: '',
+        isHomepage: true,
+      },
+    ];
+    project.homepagePageId = 'home';
+    project.currentPageId = 'home';
+    const snapshot = createPublishedSnapshot(project, 'now', new Set(['form-good']));
+    const html = publicHtml(snapshot, snapshot.pages[0], 'https://example.test/sites/demo');
+    expect(html).toContain('/webkiln-runtime.js');
+  });
 });
